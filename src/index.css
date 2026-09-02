@@ -14,3 +14,13 @@ body {
 .font-mono {
   font-family: var(--font-geist-mono);
 }
+
+/* Fonte matemática para fórmulas e teclado */
+.math-font {
+  font-family: "Times New Roman", Georgia, "STIX", "Latin Modern Roman", serif !important;
+}
+
+.math-font-italic {
+  font-family: "Times New Roman", Georgia, "STIX", "Latin Modern Roman", serif !important;
+  font-style: italic !important;
+}
