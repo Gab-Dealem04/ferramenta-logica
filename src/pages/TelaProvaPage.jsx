@@ -6,15 +6,53 @@ import { InlineMath } from "react-katex";
 export default function TelaProvaPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Estados principais
   const [lines, setLines] = useState([]);
   const [currentFormula, setCurrentFormula] = useState("");
-  const [currentRule, setCurrentRule] = useState("PREMISSA");
+  const [currentRule, setCurrentRule] = useState("");
   const [selectedReferences, setSelectedReferences] = useState([]);
-  const [activeMenu, setActiveMenu] = useState(null);
+  
+  // Controle de subprovas / Caixas de Hipótese
+  const [openBoxes, setOpenBoxes] = useState([]); 
+  const [closedBoxes, setClosedBoxes] = useState([]); 
+
+  // Variáveis ativas no teclado dinâmico (Fila fixa de até 5 elementos)
+  const [dynamicVariables, setDynamicVariables] = useState(["P", "Q", "R", "S", "T"]);
+  const inputNativeRef = useRef(null);
+
+  // Linha em foco pelo cursor
+  const [activeLineId, setActiveLineId] = useState(null);
+
+  // Posição do cursor dentro do texto da fórmula
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  // Foco do cursor: 'formula' ou 'rule'
+  const [focusedField, setFocusedField] = useState("formula");
+
+  // Teclado ativo: 'main' ou 'rules'
+  const [activeKeyboard, setActiveKeyboard] = useState("main");
   const [isSelectingReferences, setIsSelectingReferences] = useState(false);
 
-  const timerRef = useRef(null);
-  const isTouchDevice = useRef(false);
+  const availableRules = [
+    { label: "∧i", code: "∧i", latex: "\\land i" },
+    { label: "∧e", code: "∧e", latex: "\\land e" },
+    { label: "∨i", code: "∨i", latex: "\\lor i" },
+    { label: "∨e", code: "∨e", latex: "\\lor e" },
+    { label: "→i", code: "→i", latex: "\\rightarrow i" },
+    { label: "→e", code: "→e", latex: "\\rightarrow e" },
+    { label: "¬i", code: "¬i", latex: "\\neg i" },
+    { label: "¬e", code: "¬e", latex: "\\neg e" },
+    { label: "¬¬i", code: "¬¬i", latex: "\\neg\\neg i" },
+    { label: "¬¬e", code: "¬¬e", latex: "\\neg\\neg e" },
+    { label: "RAA", code: "RAA", latex: "\\text{RAA}" },
+    { label: "LTM", code: "LTM", latex: "\\text{LTM}" },
+    { label: "⊥e", code: "⊥e", latex: "\\bot e" },
+    { label: "∀i", code: "∀i", latex: "\\forall i" },
+    { label: "∀e", code: "∀e", latex: "\\forall e" },
+    { label: "∃i", code: "∃i", latex: "\\exists i" },
+    { label: "∃e", code: "∃e", latex: "\\exists e" },
+    { label: "copie", code: "copie", latex: "\\text{copie}" },
+  ];
 
   const logicalOperators = [
     { latex: "\\land", symbol: "∧" },
@@ -22,106 +60,298 @@ export default function TelaProvaPage() {
     { latex: "\\rightarrow", symbol: "→" },
     { latex: "\\neg", symbol: "¬" },
     { latex: "\\bot", symbol: "⊥" },
-    { latex: "\\forall x", symbol: "∀x" },
-    { latex: "\\exists x", symbol: "∃x" },
+    { latex: "\\forall ", symbol: "∀" },
+    { latex: "\\exists ", symbol: "∃" },
   ];
 
-  const handlePressStart = (symbol) => {
-    if (isTouchDevice.current) return;
-    timerRef.current = setTimeout(() => {
-      setActiveMenu(symbol);
-    }, 500);
-  };
-
-  const handlePressEnd = (symbol) => {
-    if (isTouchDevice.current) return;
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      if (!activeMenu) addSymbol(symbol);
+  const getRuleRefType = (rule) => {
+    switch (rule) {
+      case "∨e":
+        return "OR_ELIM";
+      case "→i":
+      case "¬i":
+      case "RAA":
+        return "RANGE";
+      case "∧i":
+      case "→e":
+        return "MULTI_LINE";
+      case "∧e":
+      case "∨i":  
+      case "¬e":
+      case "¬¬e":
+      case "⊥e":
+      case "copie":
+        return "SINGLE_LINE";
+      default:
+        return "SINGLE_LINE";
     }
   };
 
-  const handleTouchStart = (symbol) => {
-    isTouchDevice.current = true;
-    timerRef.current = setTimeout(() => {
-      setActiveMenu(symbol);
-    }, 500);
+  const getRequiredRefsCount = (rule) => {
+    const type = getRuleRefType(rule);
+    if (type === "OR_ELIM") return 3;
+    if (type === "RANGE" || type === "MULTI_LINE") return 2;
+    if (type === "SINGLE_LINE") return 1;
+    return 0;
   };
 
-  const handleTouchEnd = (symbol) => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      if (!activeMenu) {
-        addSymbol(symbol);
-      }
+  const updateCurrentLine = (newFormula, newRule, newRefs) => {
+    if (activeLineId !== null) {
+      setLines((prev) =>
+        prev.map((line) =>
+          line.id === activeLineId
+            ? { ...line, formula: newFormula, rule: newRule, references: newRefs }
+            : line
+        )
+      );
     }
-    setTimeout(() => {
-      isTouchDevice.current = false;
-    }, 100);
+  };
+
+  const handleClearRule = () => {
+    setCurrentRule("");
+    setSelectedReferences([]);
+    setIsSelectingReferences(false);
+    updateCurrentLine(currentFormula, "", []);
+  };
+
+  const handleDeleteActiveLine = () => {
+    if (activeLineId !== null) {
+      setLines((prev) => {
+        const filtered = prev.filter((l) => l.id !== activeLineId);
+        return filtered.map((line, idx) => ({ ...line, id: idx + 1 }));
+      });
+      setOpenBoxes((prev) => prev.filter((boxStartId) => boxStartId !== activeLineId));
+    }
+
+    setActiveLineId(null);
+    setCurrentFormula("");
+    setCursorPosition(0);
+    setSelectedReferences([]);
+    setCurrentRule("");
+    setIsSelectingReferences(false);
+    setFocusedField("formula");
+    setActiveKeyboard("main");
+  };
+
+  const handleTabPress = () => {
+    setFocusedField("rule");
+    setActiveKeyboard("rules");
   };
 
   const addSymbol = (s) => {
-    if (s === "⌫") {
-      if (currentFormula.length > 0) {
-        setCurrentFormula((prev) => prev.slice(0, -1));
-      } else if (lines.length > 0) {
-        const updatedLines = [...lines];
-        const lastLine = updatedLines.pop();
-        setLines(updatedLines);
-        setCurrentFormula(lastLine.formula);
-        setCurrentRule(lastLine.rule ? lastLine.rule.toUpperCase() : "PREMISSA");
-      }
-    } else if (s === "SPACE") {
-      setCurrentFormula((prev) => prev + " ");
-    } else {
-      setCurrentFormula((prev) => prev + s);
+    if (focusedField === "rule") {
+      setFocusedField("formula");
     }
-    setActiveMenu(null);
+
+    const baseText =
+      activeLineId !== null
+        ? lines.find((l) => l.id === activeLineId)?.formula || ""
+        : currentFormula;
+
+    if (s === "⌫") {
+      if (cursorPosition > 0) {
+        const newFormula =
+          baseText.slice(0, cursorPosition - 1) + baseText.slice(cursorPosition);
+        
+        setCurrentFormula(newFormula);
+        setCursorPosition((prev) => Math.max(0, prev - 1));
+        updateCurrentLine(newFormula, currentRule, selectedReferences);
+      }
+    } else {
+      const newFormula =
+        baseText.slice(0, cursorPosition) +
+        s +
+        baseText.slice(cursorPosition);
+
+      setCurrentFormula(newFormula);
+      setCursorPosition((prev) => prev + s.length);
+      updateCurrentLine(newFormula, currentRule, selectedReferences);
+    }
   };
 
-  // Define a regra vinda do popup (Intro/Elim) e ativa o modo de seleção de linhas
-  const selectRuleType = (type) => {
-    const selectedRuleName = `${activeMenu}${type}`;
-    setCurrentRule(selectedRuleName);
-    setIsSelectingReferences(true);
-    setActiveMenu(null);
+  const handleOpenNativeKeyboard = () => {
+    if (inputNativeRef.current) {
+      inputNativeRef.current.focus();
+    }
   };
 
-  // Alterna a seleção de uma linha quando tocada
-  const handleLineClick = (lineId) => {
-    if (currentRule === "PREMISSA") return;
+  const handleNativeInputChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    if (!value) return;
 
-    setSelectedReferences((prev) =>
-      prev.includes(lineId)
-        ? prev.filter((id) => id !== lineId)
-        : [...prev, lineId].sort((a, b) => a - b)
-    );
+    const charToAdd = value.slice(-1);
+
+    if (/[A-Z]/.test(charToAdd)) {
+      setDynamicVariables((prev) => {
+        if (prev.includes(charToAdd)) return prev;
+        
+        const updated = [...prev, charToAdd];
+        if (updated.length > 5) {
+          updated.shift();
+        }
+        return updated;
+      });
+
+      addSymbol(charToAdd);
+    }
+
+    e.target.value = "";
   };
 
-  // Finaliza a seleção de referências mantendo a regra ativa
-  const finishSelection = () => {
+  const moveCursor = (direction) => {
+    if (direction === "LEFT" && cursorPosition > 0) {
+      setCursorPosition((prev) => prev - 1);
+    } else if (direction === "RIGHT" && cursorPosition < currentFormula.length) {
+      setCursorPosition((prev) => prev + 1);
+    }
+  };
+
+  const confirmLineWithRule = (ruleOverride, refsOverride) => {
+    const activeRule = ruleOverride !== undefined ? ruleOverride : currentRule;
+    const activeRefs = refsOverride !== undefined ? refsOverride : selectedReferences;
+
+    if (activeLineId === null) {
+      const nextId = lines.length > 0 ? Math.max(...lines.map((l) => l.id)) + 1 : 1;
+      
+      const newLine = {
+        id: nextId,
+        formula: currentFormula || "",
+        rule: activeRule || "",
+        references: activeRefs || [],
+        boxScopes: [...openBoxes], 
+      };
+
+      if (activeRule === "HIPÓTESE") {
+        newLine.boxScopes.push(nextId);
+        setOpenBoxes((prev) => [...prev, nextId]);
+      }
+
+      setLines((prev) => [...prev, newLine]);
+    } else {
+      updateCurrentLine(currentFormula, activeRule, activeRefs);
+    }
+
+    setActiveLineId(null);
+    setCurrentFormula("");
+    setCursorPosition(0);
+    setSelectedReferences([]);
+    setCurrentRule("");
     setIsSelectingReferences(false);
+    setFocusedField("formula");
+    setActiveKeyboard("main");
+  };
+
+  const handleSelectRuleOrMode = (ruleCode) => {
+    setCurrentRule(ruleCode);
+    updateCurrentLine(currentFormula, ruleCode, selectedReferences);
+
+    setActiveKeyboard("main");
+
+    if (ruleCode === "PREMISSA" || ruleCode === "HIPÓTESE") {
+      setSelectedReferences([]);
+      setIsSelectingReferences(false);
+      confirmLineWithRule(ruleCode, []);
+    } else {
+      setIsSelectingReferences(true);
+      setFocusedField("formula");
+    }
+  };
+
+  const handleCloseCurrentBox = () => {
+    if (openBoxes.length > 0) {
+      const closedBoxStart = openBoxes[openBoxes.length - 1];
+      const lastLineId = lines.length > 0 ? lines[lines.length - 1].id : closedBoxStart;
+
+      setClosedBoxes((prev) => [...prev, { start: closedBoxStart, end: lastLineId }]);
+      setOpenBoxes((prev) => prev.slice(0, -1));
+
+      if (getRuleRefType(currentRule) !== "∨e") {
+        setSelectedReferences([`${closedBoxStart}-${lastLineId}`]);
+      }
+    }
+  };
+
+  const handleLineClick = (line, targetField = "formula") => {
+    if (isSelectingReferences) {
+      const refType = getRuleRefType(currentRule);
+
+      if (refType === "OR_ELIM") {
+        setSelectedReferences((prev) => {
+          const matchingBox = closedBoxes.find(
+            (box) => line.id >= box.start && line.id <= box.end
+          );
+
+          let newRef;
+          if (matchingBox) {
+            newRef = `${matchingBox.start}-${matchingBox.end}`;
+          } else {
+            newRef = line.id;
+          }
+
+          if (prev.includes(newRef)) {
+            const updated = prev.filter((r) => r !== newRef);
+            updateCurrentLine(currentFormula, currentRule, updated);
+            return updated;
+          }
+
+          if (prev.length >= 3) return prev;
+
+          const updated = [...prev, newRef];
+          updateCurrentLine(currentFormula, currentRule, updated);
+          return updated;
+        });
+      } else if (refType === "RANGE") {
+        setSelectedReferences((prev) => {
+          let updated;
+          if (prev.length === 0 || typeof prev[0] === "string") {
+            updated = [line.id];
+          } else if (prev.length === 1) {
+            const start = Math.min(prev[0], line.id);
+            const end = Math.max(prev[0], line.id);
+            updated = [`${start}-${end}`];
+          } else {
+            updated = [line.id];
+          }
+          updateCurrentLine(currentFormula, currentRule, updated);
+          return updated;
+        });
+      } else {
+        const maxRefs = getRequiredRefsCount(currentRule);
+
+        setSelectedReferences((prev) => {
+          let updated;
+          if (prev.includes(line.id)) {
+            updated = prev.filter((id) => id !== line.id);
+          } else {
+            if (prev.length >= maxRefs) return prev;
+            updated = [...prev, line.id].sort((a, b) => a - b);
+          }
+          updateCurrentLine(currentFormula, currentRule, updated);
+          return updated;
+        });
+      }
+    } else {
+      setActiveLineId(line.id);
+      setCurrentFormula(line.formula || "");
+      setCursorPosition((line.formula || "").length);
+      setCurrentRule(line.rule || "");
+      setSelectedReferences(line.references || []);
+      setFocusedField(targetField);
+
+      if (targetField === "rule") {
+        setActiveKeyboard("rules");
+      } else {
+        setActiveKeyboard("main");
+      }
+    }
   };
 
   const confirmLine = () => {
-    const nextId = lines.length > 0 ? Math.max(...lines.map((l) => l.id)) + 1 : 1;
+    confirmLineWithRule();
+  };
 
-    let ruleText = currentRule.toLowerCase();
-    if (selectedReferences.length > 0) {
-      ruleText += ` ${selectedReferences.join(", ")}`;
-    }
-
-    const newLine = {
-      id: nextId,
-      formula: currentFormula || "",
-      rule: currentFormula ? ruleText : "",
-    };
-
-    setLines([...lines, newLine]);
-    setCurrentFormula("");
-    setSelectedReferences([]);
-    setCurrentRule("PREMISSA");
-    setIsSelectingReferences(false);
+  const finishSelection = () => {
+    confirmLineWithRule();
   };
 
   const formatToLatex = (text) => {
@@ -133,12 +363,137 @@ export default function TelaProvaPage() {
       .replace(/∧/g, " \\land ")
       .replace(/∨/g, " \\lor ")
       .replace(/⊥/g, " \\bot ")
-      .replace(/∀x/g, " \\forall x ")
-      .replace(/∃x/g, " \\exists x ");
+      .replace(/∀/g, " \\forall  ")
+      .replace(/∃/g, " \\exists  ");
+  };
+
+  const renderFormulaWithCursor = (isFocused) => {
+    const before = currentFormula.slice(0, cursorPosition);
+    const after = currentFormula.slice(cursorPosition);
+
+    return (
+      <span className="flex items-center font-bold text-blue-700 text-base">
+        {before && <InlineMath math={formatToLatex(before)} />}
+        {isFocused && (
+          <span className="animate-pulse border-r-2 border-blue-600 h-5 inline-block mx-[1px]"></span>
+        )}
+        {after && <InlineMath math={formatToLatex(after)} />}
+      </span>
+    );
+  };
+
+  const getRuleLatex = (code) => {
+    const found = availableRules.find((r) => r.code === code);
+    return found ? found.latex : formatToLatex(code);
+  };
+
+  const renderNestedBoxes = (scopes, lineId, isEditing = false, content) => {
+    if (!scopes || scopes.length === 0) {
+      return <div className="flex-1 flex items-center h-full px-2 ml-1">{content}</div>;
+    }
+
+    const renderLevel = (index) => {
+      if (index >= scopes.length) {
+        return content;
+      }
+
+      const boxStartId = scopes[index];
+      const isStart = lineId === boxStartId;
+
+      const isClosedBoxEnd = closedBoxes.some(
+        (box) => box.start === boxStartId && box.end === lineId
+      );
+
+      const borderClasses = `border-l-2 border-slate-700 bg-slate-50/20 ${
+        isStart ? "border-t-2 border-r-2" : "border-r-2"
+      } ${isClosedBoxEnd ? "border-b-2" : ""}`;
+
+      return (
+        <div className={`flex-1 flex items-center h-full px-1.5 ${borderClasses}`}>
+          {renderLevel(index + 1)}
+        </div>
+      );
+    };
+
+    return <div className="flex-1 flex items-center h-full ml-1">{renderLevel(0)}</div>;
+  };
+
+  const RuleWithBox = ({ rule, references = [], isFocused = false, isSelecting = false, onClick }) => {
+    const isSimpleType = rule === "PREMISSA" || rule === "HIPÓTESE";
+    const refType = getRuleRefType(rule);
+
+    const renderSlots = () => {
+      if (refType === "OR_ELIM") {
+        return references.length > 0 ? references.join(", ") : "disj, c1, c2";
+      }
+      if (refType === "RANGE") {
+        return references.length > 0 ? references[0] : "_–_";
+      }
+      const requiredCount = getRequiredRefsCount(rule);
+      const slots = [];
+      for (let i = 0; i < requiredCount; i++) {
+        if (references[i] !== undefined) {
+          slots.push(references[i]);
+        } else {
+          slots.push("_");
+        }
+      }
+      return slots.join(",");
+    };
+
+    return (
+      <div 
+        onClick={onClick}
+        className="flex items-center gap-1.5 font-mono text-xs font-bold pr-1 cursor-pointer shrink-0"
+      >
+        {isFocused && !rule && (
+          <span className="animate-pulse border-r-2 border-blue-600 h-4 inline-block my-auto text-transparent">
+            _
+          </span>
+        )}
+
+        {rule && (
+          <span className={isSimpleType ? "text-blue-600 font-bold lowercase flex items-center" : "text-blue-500 lowercase flex items-center"}>
+            {isSimpleType ? (
+              rule.toLowerCase()
+            ) : (
+              <InlineMath math={getRuleLatex(rule)} />
+            )}
+            {isFocused && (
+              <span className="animate-pulse border-r-2 border-blue-600 h-4 inline-block ml-1"></span>
+            )}
+          </span>
+        )}
+
+        {!isSimpleType && rule && (
+          isSelecting ? (
+            <div className="min-w-[24px] h-[20px] px-1.5 border border-dashed border-blue-400 rounded flex items-center justify-center bg-blue-50/50 font-bold text-blue-700 text-[11px] ml-0.5">
+              {renderSlots()}
+            </div>
+          ) : (
+            references.length > 0 && (
+              <span className="text-blue-700 font-extrabold text-[11px] ml-0.5">
+                {references.join(", ")}
+              </span>
+            )
+          )
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto border-x shadow-2xl font-sans overflow-hidden relative select-none">
+      
+      {/* INPUT INVISÍVEL */}
+      <input
+        ref={inputNativeRef}
+        type="text"
+        className="absolute opacity-0 pointer-events-none -top-10 left-0 h-0 w-0"
+        onChange={handleNativeInputChange}
+        autoCapitalize="characters"
+      />
+
       {isSidebarOpen && (
         <div
           className="absolute inset-0 bg-slate-900/40 z-40 animate-in fade-in"
@@ -190,9 +545,10 @@ export default function TelaProvaPage() {
 
         <button
           onClick={() => alert("Compilando prova atual...")}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider text-blue-700 bg-blue-50/50 hover:bg-blue-50 border border-blue-200/60 rounded-xl active:scale-95 transition-all uppercase"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider text-blue-600 bg-blue-50/50 hover:bg-blue-100/60 border border-blue-500 rounded-xl active:scale-95 transition-all uppercase"
         >
-          <span className="text-blue-500 text-[10px]">▶</span> Compilar
+          <span className="w-0 h-0 border-y-[4px] border-y-transparent border-l-[7px] border-l-blue-600 inline-block"></span>
+          Compilar
         </button>
       </header>
 
@@ -211,179 +567,301 @@ export default function TelaProvaPage() {
         <div className="flex-1 bg-white relative overflow-y-auto p-4 shadow-inner">
           <div className="absolute left-10 top-0 bottom-0 w-[1px] bg-red-200"></div>
 
-          {/* AVISO DO MODO DE REGRAS ATIVO COM BOTÃO DE CONFIRMAÇÃO DE LINHAS */}
+          {/* LINHAS GRAVADAS */}
+          <div className="space-y-0">
+            {lines.map((line) => {
+              const isActive = activeLineId === line.id;
+
+              const isSelectedRef =
+                selectedReferences.includes(line.id) ||
+                selectedReferences.some(
+                  (ref) =>
+                    typeof ref === "string" &&
+                    ref.split("-").map(Number).includes(line.id)
+                );
+
+              const scopes = line.boxScopes || [];
+
+              const lineContent = (
+                <>
+                  <div 
+                    onClick={() => handleLineClick(line, "formula")}
+                    className="flex-1 flex items-center font-bold text-slate-700 text-base cursor-pointer overflow-x-auto"
+                  >
+                    {isActive ? (
+                      renderFormulaWithCursor(focusedField === "formula")
+                    ) : (
+                      <InlineMath math={formatToLatex(line.formula)} />
+                    )}
+                  </div>
+
+                  <RuleWithBox 
+                    rule={line.rule} 
+                    references={line.references} 
+                    isFocused={isActive && focusedField === "rule"}
+                    isSelecting={isActive && isSelectingReferences}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLineClick(line, "rule");
+                    }}
+                  />
+                </>
+              );
+
+              return (
+                <div
+                  key={line.id}
+                  className={`relative flex items-center h-10 border-b transition-all select-none ${
+                    isActive
+                      ? "bg-blue-50/80 border-blue-300"
+                      : isSelectedRef
+                      ? "bg-blue-100/70 border-blue-300"
+                      : "border-blue-100 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="w-8 text-[10px] text-slate-400 font-mono flex items-center justify-between z-10 pl-1 shrink-0">
+                    {line.id}
+                    {isSelectedRef && <span className="text-blue-600 font-bold ml-0.5">✓</span>}
+                  </span>
+
+                  {renderNestedBoxes(scopes, line.id, false, lineContent)}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* LINHA NOVA EM EDIÇÃO */}
+          {activeLineId === null && (
+            <div className="flex items-center h-10 border-b border-blue-300 bg-blue-50/50 mt-0">
+              <span className="w-8 text-[10px] text-blue-400 font-mono z-10 pl-1 shrink-0">
+                {lines.length > 0 ? Math.max(...lines.map((l) => l.id)) + 1 : 1}
+              </span>
+
+              {renderNestedBoxes(
+                openBoxes,
+                lines.length + 1,
+                true,
+                <>
+                  <div 
+                    onClick={() => setFocusedField("formula")}
+                    className="flex-1 flex items-center cursor-pointer"
+                  >
+                    {renderFormulaWithCursor(focusedField === "formula")}
+                  </div>
+
+                  <RuleWithBox 
+                    rule={currentRule} 
+                    references={selectedReferences} 
+                    isFocused={focusedField === "rule"}
+                    isSelecting={isSelectingReferences}
+                    onClick={() => {
+                      setFocusedField("rule");
+                      setActiveKeyboard("rules");
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* CONTROLE DE TECLADOS DINÂMICOS & BOTÃO DE ENCERRAR CAIXA */}
+        <div className="bg-white p-3 space-y-2 border-t z-10">
+          
+          {/* BOTÃO COMPACTO AZUL PARA ENCERRAR CAIXA NO LADO DIREITO */}
+          {openBoxes.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={handleCloseCurrentBox}
+                className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-[10px] rounded-lg shadow transition-all flex items-center gap-1 active:scale-95"
+              >
+                <span>↵</span> Encerrar Caixa ({openBoxes.length})
+              </button>
+            </div>
+          )}
+
           {isSelectingReferences && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium px-3 py-1.5 rounded-lg mb-2 flex justify-between items-center animate-in fade-in gap-2">
+            <div className="bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-medium px-3 py-1.5 rounded-lg flex justify-between items-center animate-in fade-in gap-2 shadow-sm">
               <div className="flex items-center gap-1.5 overflow-hidden">
-                <span>👇 Selecione as linhas para <strong>{currentRule}</strong>:</span>
+                <span className="flex items-center gap-1">
+                  {getRuleRefType(currentRule) === "OR_ELIM"
+                    ? "Selecione a disjunção e as duas caixas para "
+                    : getRuleRefType(currentRule) === "RANGE"
+                    ? "Clique na hipótese e no fim do intervalo para "
+                    : "Selecione as linhas para "}
+                  <strong>
+                    <InlineMath math={getRuleLatex(currentRule)} />
+                  </strong>
+                  :
+                </span>
                 {selectedReferences.length > 0 && (
-                  <span className="font-bold bg-amber-200 px-1.5 py-0.5 rounded text-[10px] shrink-0">
+                  <span className="font-bold bg-blue-200 text-blue-900 px-1.5 py-0.5 rounded text-[10px] shrink-0">
                     {selectedReferences.join(", ")}
                   </span>
                 )}
               </div>
               <button
                 onClick={finishSelection}
-                className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-[10px] px-2.5 py-1 rounded-md shadow-sm transition-all shrink-0 flex items-center gap-1"
+                className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[10px] px-2.5 py-1 rounded-md shadow-sm transition-all shrink-0"
               >
-                ✓ OK
+                OK
               </button>
             </div>
           )}
 
-          {/* LINHAS GRAVADAS */}
-          <div className="space-y-0">
-            {lines.map((line) => {
-              const isSelected = selectedReferences.includes(line.id);
-              return (
-                <div
-                  key={line.id}
-                  onClick={() => handleLineClick(line.id)}
-                  className={`flex items-center h-10 border-b transition-colors cursor-pointer select-none ${
-                    isSelected
-                      ? "bg-blue-100/70 border-blue-300"
-                      : "border-blue-100 hover:bg-slate-50"
-                  }`}
+          {/* TECLADO 1: INICIAL / FÓRMULAS */}
+          {activeKeyboard === "main" && (
+            <div className="space-y-2 animate-in fade-in duration-150">
+              
+              {/* GRADE FIXA DE 8 COLUNAS (TAB, 5 DYN VARS, '...', ⌫) */}
+              <div className="grid grid-cols-8 gap-1">
+                <button
+                  onClick={handleTabPress}
+                  className="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-xl font-black text-xs active:bg-blue-100 shadow-sm flex items-center justify-center"
                 >
-                  <span className="w-6 text-[10px] text-slate-400 font-mono flex items-center justify-between">
-                    {line.id}
-                    {isSelected && <span className="text-blue-600 font-bold ml-1">✓</span>}
-                  </span>
-                  <span className="flex-1 pl-8 font-bold text-slate-700 flex items-center gap-2 text-base">
-                    <InlineMath math={formatToLatex(line.formula)} />
-                  </span>
-                  {line.rule && (
-                    <span className="text-[10px] font-bold text-blue-500 font-mono pr-2 lowercase">
-                      {line.rule}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  ⇥
+                </button>
 
-          {/* LINHA ATIVA DINÂMICA */}
-          <div className="flex items-center h-10 border-b border-blue-300 bg-blue-50/50 mt-0">
-            <span className="w-6 text-[10px] text-blue-400 font-mono ml-0">
-              {lines.length > 0 ? Math.max(...lines.map((l) => l.id)) + 1 : 1}
-            </span>
+                {/* EXATAMENTE 5 BOTÕES DE VARIÁVEIS */}
+                {dynamicVariables.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => addSymbol(s)}
+                    className="bg-slate-50 border border-slate-200 py-3 rounded-xl font-bold text-slate-700 shadow-sm active:bg-slate-200 text-sm flex items-center justify-center"
+                  >
+                    <InlineMath math={s} />
+                  </button>
+                ))}
 
-            <div className="flex-1 pl-8 flex items-center gap-2">
-              <span className="font-bold text-blue-700 text-base">
-                {currentFormula ? (
-                  <InlineMath math={formatToLatex(currentFormula)} />
-                ) : null}
-              </span>
-              <span className="animate-pulse border-r-2 border-blue-600 h-5"></span>
-            </div>
+                {/* BOTÃO '...' */}
+                <button
+                  onClick={handleOpenNativeKeyboard}
+                  title="Digitar nova letra"
+                  className="bg-slate-200 border border-slate-300 text-slate-700 py-3 rounded-xl font-black text-xs active:bg-slate-300 shadow-sm flex items-center justify-center"
+                >
+                  ...
+                </button>
 
-            <span className="text-[9px] font-extrabold text-blue-500 font-mono pr-2 uppercase tracking-wider">
-              {currentRule}
-              {selectedReferences.length > 0 && ` (${selectedReferences.join(",")})`}
-            </span>
-          </div>
-        </div>
+                {/* BACKSPACE */}
+                <button
+                  onClick={() => addSymbol("⌫")}
+                  className="bg-slate-50 border border-slate-200 py-3 rounded-xl font-bold text-slate-700 shadow-sm active:bg-slate-200 text-sm flex items-center justify-center"
+                >
+                  ⌫
+                </button>
+              </div>
 
-        {/* TECLADO E CONTROLES INTEGRADOS */}
-        <div className="bg-white p-3 space-y-2 border-t z-10">
-          <div className="flex gap-1.5 pb-1 border-b border-slate-100">
-            {["PREMISSA", "HIPÓTESE", "REGRA"].map((mode) => (
-              <button
-                key={mode}
-                onClick={() => {
-                  setCurrentRule(mode);
-                  if (mode === "PREMISSA") {
-                    setSelectedReferences([]);
-                    setIsSelectingReferences(false);
-                  } else if (mode === "REGRA") {
-                    setIsSelectingReferences(true);
-                  }
-                }}
-                className={`flex-1 py-1.5 rounded-lg text-[10px] font-black tracking-wider transition-colors uppercase ${
-                  currentRule === mode
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                }`}
-              >
-                {mode === "HIPÓTESE" ? "Hipótese" : mode.toLowerCase()}
-              </button>
-            ))}
-          </div>
+              {/* SIMBOLOS LÓGICOS */}
+              <div className="grid grid-cols-7 gap-1">
+                {logicalOperators.map((item) => (
+                  <button
+                    key={item.symbol}
+                    onClick={() => addSymbol(item.symbol)}
+                    className="bg-slate-800 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center text-lg"
+                  >
+                    <InlineMath math={item.latex} />
+                  </button>
+                ))}
+              </div>
 
-          {/* POPUP DE INTRODUÇÃO E ELIMINAÇÃO DA REGRA */}
-          {activeMenu && (
-            <div className="flex justify-center gap-2 mb-1 animate-in fade-in zoom-in duration-200">
-              <button
-                onClick={() => selectRuleType("i")}
-                className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md active:scale-95 transition-transform"
-              >
-                Intro ({activeMenu}i)
-              </button>
-              <button
-                onClick={() => selectRuleType("e")}
-                className="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md active:scale-95 transition-transform"
-              >
-                Elim ({activeMenu}e)
-              </button>
+              {/* CONTROLES E CONFIRMAÇÃO */}
+              <div className="flex gap-1.5 h-12">
+                <button
+                  onClick={() => addSymbol("(")}
+                  className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200"
+                >
+                  (
+                </button>
+                <button
+                  onClick={() => addSymbol(")")}
+                  className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200"
+                >
+                  )
+                </button>
+                <button
+                  onClick={() => moveCursor("LEFT")}
+                  className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 active:bg-slate-200 text-base flex items-center justify-center"
+                >
+                  ◀
+                </button>
+                <button
+                  onClick={() => moveCursor("RIGHT")}
+                  className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 active:bg-slate-200 text-base flex items-center justify-center"
+                >
+                  ▶
+                </button>
+                <button
+                  onClick={confirmLine}
+                  className="flex-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl flex items-center justify-center active:bg-slate-200 font-bold text-lg shadow-sm"
+                >
+                  ↵
+                </button>
+              </div>
             </div>
           )}
 
-          {/* TECLADO DE VARIÁVEIS */}
-          <div className="grid grid-cols-8 gap-1.5">
-            {["P", "Q", "R", "S", "T", "U", "V", "⌫"].map((s) => (
-              <button
-                key={s}
-                onClick={() => addSymbol(s)}
-                className="bg-slate-50 border border-slate-200 py-3 rounded-xl font-bold text-slate-700 shadow-sm active:bg-slate-200 text-sm"
-              >
-                {s === "⌫" ? s : <InlineMath math={s} />}
-              </button>
-            ))}
-          </div>
+          {/* TECLADO 2: REGRAS / TIPOS */}
+          {activeKeyboard === "rules" && (
+            <div className="space-y-2 animate-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between pb-1 border-b">
+                <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">
+                  Escolha o Tipo ou Regra:
+                </span>
+                <button
+                  onClick={() => {
+                    setActiveKeyboard("main");
+                    setFocusedField("formula");
+                  }}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                >
+                  ✕ Voltar
+                </button>
+              </div>
 
-          {/* TECLADO DE SÍMBOLOS LÓGICOS COM LATEX */}
-          <div className="grid grid-cols-7 gap-1">
-            {logicalOperators.map((item) => (
-              <button
-                key={item.symbol}
-                onMouseDown={() => handlePressStart(item.symbol)}
-                onMouseUp={() => handlePressEnd(item.symbol)}
-                onTouchStart={() => handleTouchStart(item.symbol)}
-                onTouchEnd={() => handleTouchEnd(item.symbol)}
-                className="bg-slate-800 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center text-lg"
-              >
-                <InlineMath math={item.latex} />
-              </button>
-            ))}
-          </div>
+              {activeLineId !== null && (
+                <button
+                  onClick={handleDeleteActiveLine}
+                  className="w-full py-2 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1 active:scale-98"
+                >
+                  <span>🗑</span> Remover Linha {activeLineId}
+                </button>
+              )}
 
-          {/* TECLADO DE AÇÕES E PARÊNTESES */}
-          <div className="flex gap-1.5 h-12">
-            <button
-              onClick={() => addSymbol("(")}
-              className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200"
-            >
-              (
-            </button>
-            <button
-              onClick={() => addSymbol(")")}
-              className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200"
-            >
-              )
-            </button>
-            <button
-              onClick={() => addSymbol("SPACE")}
-              className="flex-[3] bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center active:bg-slate-200"
-            >
-              <div className="w-12 h-0.5 bg-slate-400 rounded-full"></div>
-            </button>
-            <button
-              onClick={confirmLine}
-              className="flex-1 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center active:bg-slate-200 text-slate-600 font-bold text-lg"
-            >
-              ↵
-            </button>
-          </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => handleSelectRuleOrMode("PREMISSA")}
+                  className="py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200"
+                >
+                  Premissa
+                </button>
+                <button
+                  onClick={() => handleSelectRuleOrMode("HIPÓTESE")}
+                  className="py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200"
+                >
+                  Hipótese
+                </button>
+                <button
+                  onClick={handleClearRule}
+                  className="py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span>⌫</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {availableRules.map((rule) => (
+                  <button
+                    key={rule.code}
+                    onClick={() => handleSelectRuleOrMode(rule.code)}
+                    className="py-2.5 bg-slate-800 text-white rounded-xl text-xs font-black shadow-md active:scale-95 transition-transform flex items-center justify-center"
+                  >
+                    <InlineMath math={rule.latex} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
