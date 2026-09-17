@@ -4,7 +4,7 @@ import TelaProvaPage from "./pages/TelaProvaPage.jsx";
 
 export default function App() {
   return (
-    <Routes basename = "ferramenta-logica">
+    <Routes>
       <Route path="/" element={<AreaEstudosPage />} />
       <Route path="/tela-prova" element={<TelaProvaPage />} />
     </Routes>
