@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: command === 'build' ? '/ferramenta-logica-two/' : '/',
+  base: command === 'build' ? '/ferramenta-logica/' : '/',
   server: {
     host: true,
     port: 5173,
