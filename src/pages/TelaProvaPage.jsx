@@ -11,10 +11,10 @@ export default function TelaProvaPage() {
   const [currentFormula, setCurrentFormula] = useState("");
   const [currentRule, setCurrentRule] = useState("");
   const [selectedReferences, setSelectedReferences] = useState([]);
-  
+
   // Controle de subprovas / Caixas de Hipótese
-  const [openBoxes, setOpenBoxes] = useState([]); 
-  const [closedBoxes, setClosedBoxes] = useState([]); 
+  const [openBoxes, setOpenBoxes] = useState([]);
+  const [closedBoxes, setClosedBoxes] = useState([]);
 
   // Variáveis ativas no teclado dinâmico (Fila fixa de até 5 elementos)
   const [dynamicVariables, setDynamicVariables] = useState(["P", "Q", "R", "S", "T"]);
@@ -32,6 +32,9 @@ export default function TelaProvaPage() {
   // Teclado ativo: 'main' ou 'rules'
   const [activeKeyboard, setActiveKeyboard] = useState("main");
   const [isSelectingReferences, setIsSelectingReferences] = useState(false);
+
+  // Controle do teclado nativo do celular
+  const [isNativeKeyboardActive, setIsNativeKeyboardActive] = useState(false);
 
   const availableRules = [
     { label: "∧i", code: "∧i", latex: "\\land i" },
@@ -76,7 +79,7 @@ export default function TelaProvaPage() {
       case "→e":
         return "MULTI_LINE";
       case "∧e":
-      case "∨i":  
+      case "∨i":
       case "¬e":
       case "¬¬e":
       case "⊥e":
@@ -152,7 +155,7 @@ export default function TelaProvaPage() {
       if (cursorPosition > 0) {
         const newFormula =
           baseText.slice(0, cursorPosition - 1) + baseText.slice(cursorPosition);
-        
+
         setCurrentFormula(newFormula);
         setCursorPosition((prev) => Math.max(0, prev - 1));
         updateCurrentLine(newFormula, currentRule, selectedReferences);
@@ -170,8 +173,19 @@ export default function TelaProvaPage() {
   };
 
   const handleOpenNativeKeyboard = () => {
+    setIsNativeKeyboardActive(true);
+    // Pequeno delay para garantir que o input está pronto para receber foco
+    setTimeout(() => {
+      if (inputNativeRef.current) {
+        inputNativeRef.current.focus();
+      }
+    }, 50);
+  };
+
+  const finishNativeInput = () => {
+    setIsNativeKeyboardActive(false);
     if (inputNativeRef.current) {
-      inputNativeRef.current.focus();
+      inputNativeRef.current.blur();
     }
   };
 
@@ -184,7 +198,7 @@ export default function TelaProvaPage() {
     if (/[A-Z]/.test(charToAdd)) {
       setDynamicVariables((prev) => {
         if (prev.includes(charToAdd)) return prev;
-        
+
         const updated = [...prev, charToAdd];
         if (updated.length > 5) {
           updated.shift();
@@ -196,6 +210,17 @@ export default function TelaProvaPage() {
     }
 
     e.target.value = "";
+  };
+
+  const handleNativeInputKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      finishNativeInput();
+    }
+  };
+
+  const handleNativeInputBlur = () => {
+    setIsNativeKeyboardActive(false);
   };
 
   const moveCursor = (direction) => {
@@ -212,13 +237,13 @@ export default function TelaProvaPage() {
 
     if (activeLineId === null) {
       const nextId = lines.length > 0 ? Math.max(...lines.map((l) => l.id)) + 1 : 1;
-      
+
       const newLine = {
         id: nextId,
         formula: currentFormula || "",
         rule: activeRule || "",
         references: activeRefs || [],
-        boxScopes: [...openBoxes], 
+        boxScopes: [...openBoxes],
       };
 
       if (activeRule === "HIPÓTESE") {
@@ -442,7 +467,7 @@ export default function TelaProvaPage() {
     };
 
     return (
-      <div 
+      <div
         onClick={onClick}
         className="flex items-center gap-1.5 font-mono text-xs font-bold pr-1 cursor-pointer shrink-0"
       >
@@ -484,14 +509,24 @@ export default function TelaProvaPage() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto border-x shadow-2xl font-sans overflow-hidden relative select-none">
-      
-      {/* INPUT INVISÍVEL */}
+
+      {/* INPUT INVISÍVEL PARA O TECLADO NATIVO */}
       <input
         ref={inputNativeRef}
-        type="text"
-        className="absolute opacity-0 pointer-events-none -top-10 left-0 h-0 w-0"
-        onChange={handleNativeInputChange}
+        type="search"
+        inputMode="search"
         autoCapitalize="characters"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        name="no-autofill-field"
+        data-form-type="other"
+        data-lpignore="true"
+        aria-autocomplete="none"
+        className="absolute opacity-0 top-0 left-0 h-px w-px -z-10"
+        onChange={handleNativeInputChange}
+        onKeyDown={handleNativeInputKeyDown}
+        onBlur={handleNativeInputBlur}
       />
 
       {isSidebarOpen && (
@@ -552,6 +587,22 @@ export default function TelaProvaPage() {
         </button>
       </header>
 
+      {/* BANNER FIXO DO TECLADO NATIVO - SEMPRE VISÍVEL NO TOPO */}
+      {isNativeKeyboardActive && (
+        <div className="bg-blue-600 text-white text-[12px] font-bold px-4 py-2.5 flex justify-between items-center gap-2 shadow-md z-20 animate-in slide-in-from-top-2 duration-200">
+          <span className="flex items-center gap-2">
+            <span className="animate-pulse">⌨️</span>
+            Digitando com o teclado do celular...
+          </span>
+          <button
+            onClick={finishNativeInput}
+            className="bg-white text-blue-700 hover:bg-blue-50 active:scale-95 font-black text-[11px] px-3 py-1.5 rounded-lg shadow-sm transition-all shrink-0 uppercase tracking-wide"
+          >
+            ✓ Pronto
+          </button>
+        </div>
+      )}
+
       {/* CORPO DA TELA DE PROVA */}
       <div className="flex flex-col h-full overflow-hidden">
         <div className="bg-slate-100 border-b px-3 py-2 flex items-center justify-between shadow-sm z-10">
@@ -584,7 +635,7 @@ export default function TelaProvaPage() {
 
               const lineContent = (
                 <>
-                  <div 
+                  <div
                     onClick={() => handleLineClick(line, "formula")}
                     className="flex-1 flex items-center font-bold text-slate-700 text-base cursor-pointer overflow-x-auto"
                   >
@@ -595,9 +646,9 @@ export default function TelaProvaPage() {
                     )}
                   </div>
 
-                  <RuleWithBox 
-                    rule={line.rule} 
-                    references={line.references} 
+                  <RuleWithBox
+                    rule={line.rule}
+                    references={line.references}
                     isFocused={isActive && focusedField === "rule"}
                     isSelecting={isActive && isSelectingReferences}
                     onClick={(e) => {
@@ -642,16 +693,16 @@ export default function TelaProvaPage() {
                 lines.length + 1,
                 true,
                 <>
-                  <div 
+                  <div
                     onClick={() => setFocusedField("formula")}
                     className="flex-1 flex items-center cursor-pointer"
                   >
                     {renderFormulaWithCursor(focusedField === "formula")}
                   </div>
 
-                  <RuleWithBox 
-                    rule={currentRule} 
-                    references={selectedReferences} 
+                  <RuleWithBox
+                    rule={currentRule}
+                    references={selectedReferences}
                     isFocused={focusedField === "rule"}
                     isSelecting={isSelectingReferences}
                     onClick={() => {
@@ -667,7 +718,7 @@ export default function TelaProvaPage() {
 
         {/* CONTROLE DE TECLADOS DINÂMICOS & BOTÃO DE ENCERRAR CAIXA */}
         <div className="bg-white p-3 space-y-2 border-t z-10">
-          
+
           {/* BOTÃO COMPACTO AZUL PARA ENCERRAR CAIXA NO LADO DIREITO */}
           {openBoxes.length > 0 && (
             <div className="flex justify-end">
@@ -710,9 +761,9 @@ export default function TelaProvaPage() {
           )}
 
           {/* TECLADO 1: INICIAL / FÓRMULAS */}
-          {activeKeyboard === "main" && (
+          {activeKeyboard === "main" && !isNativeKeyboardActive && (
             <div className="space-y-2 animate-in fade-in duration-150">
-              
+
               {/* GRADE FIXA DE 8 COLUNAS (TAB, 5 DYN VARS, '...', ⌫) */}
               <div className="grid grid-cols-8 gap-1">
                 <button
