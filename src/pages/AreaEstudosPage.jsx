@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useRef, useEffect, useState } from "react";
+import { Link,  useLocation, useNavigate} from "react-router-dom";
 import AddProofModal from "./components/AddProofModal";
 import ProofDetailView from "./components/ProofDetailView";
 import SimulatorConfigMenu from "./components/SimulatorConfigMenu";
@@ -14,6 +14,8 @@ export default function AreaEstudosPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const navigate = useNavigate(); // 2. Instancie o hook
+
   const [filterType, setFilterType] = useState("Todos");
   const [sortType, setSortType] = useState("data_criacao");
   const [isAsc, setIsAsc] = useState(true);
@@ -24,46 +26,23 @@ export default function AreaEstudosPage() {
   const [activeMenu, setActiveMenu] = useState(null);
   const timerRef = useRef(null);
 
-  const [historicoAtividades, setHistoricoAtividades] = useState([
-    {
-      id: 1,
-      title: "Atividade Disjunção Exclusão",
-      status: "Concluído",
-      tipoDeducao: "Lógica Proposicional",
-      dataCriacao: 1648771200000,
-      ultimaModificacao: 1680307200000,
-      premissasIniciais: [
-        { id: 1, formula: "A → C", rule: "premissa" },
-        { id: 2, formula: "B → C", rule: "premissa" },
-        { id: 3, formula: "A ∨ B", rule: "premissa" },
-      ],
-      temSubprovas: true,
-    },
-    {
-      id: 2,
-      title: "Atividade Implicação Exclusão",
-      status: "Concluído",
-      tipoDeducao: "Lógica Proposicional",
-      dataCriacao: 1651363200000,
-      ultimaModificacao: 1651363200000,
-      premissasIniciais: [
-        { id: 1, formula: "P → Q", rule: "premissa" },
-        { id: 2, formula: "P", rule: "premissa" },
-        { id: 3, formula: "Q", rule: "→e 1,2" },
-      ],
-      temSubprovas: false,
-    },
-    {
-      id: 3,
-      title: "Atividade Implicação Introdução",
-      status: "Pendente",
-      tipoDeducao: "Lógica de Predicados",
-      dataCriacao: 1711929600000,
-      ultimaModificacao: 1711929600000,
-      premissasIniciais: [{ id: 1, formula: "R → S", rule: "premissa" }],
-      temSubprovas: false,
-    },
-  ]);
+  const handleOpenProofRe = (prova) => {
+    navigate("/tela-prova", { 
+      state: { 
+        provaData: prova,
+        mode: "edit" 
+      } 
+    });
+  };
+
+  const [historicoAtividades, setHistoricoAtividades] = useState(() => {
+    try {
+      const saved = localStorage.getItem("historicoAtividades");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Erro ao carregar histórico: ", e);
+    }
+  });
 
   const materiais = [
     { id: 1, title: "Manual de Sobrevivência em Dedução Natural", type: "PDF", size: "2.4 MB", downloaded: true },
@@ -73,6 +52,14 @@ export default function AreaEstudosPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("historicoAtividades", JSON.stringify(historicoAtividades));
+    } catch (e) {
+      console.error("Erro ao salvar histórico:", e);
+    }
+}, [historicoAtividades]);
 
   const handleOpenProof = (prova) => {
     setSelectedProof(prova);
@@ -94,11 +81,9 @@ export default function AreaEstudosPage() {
       temSubprovas: false,
     };
 
-    setIsAddModalOpen(false);
-    setSelectedProof(newProof);
-    setLines([]);
-    setCurrentFormula("");
-    setCurrentRule("PREMISSA");
+    setHistoricoAtividades((prev) => [newProof, ...prev]);
+
+    navigate("/tela-prova", { state: { provaData: newProof, mode: "new" } });
   };
 
   const handleSaveAndBack = () => {
@@ -199,9 +184,7 @@ export default function AreaEstudosPage() {
               <Link to="/" className="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-50">
                 <span>📝</span> Histórico
               </Link>
-              <Link to="/tela-prova" className="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl bg-blue-50 text-blue-700">
-                <span>📜</span> Laboratório Principal
-              </Link>
+              
             </nav>
           )}
         </div>
