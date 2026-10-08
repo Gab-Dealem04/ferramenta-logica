@@ -120,7 +120,6 @@ export default function TelaProvaPage() {
           className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider text-blue-600 bg-blue-50/50 hover:bg-blue-100/60 border border-blue-500 rounded-xl active:scale-95 transition-all uppercase"
         >
           <span className="w-0 h-0 border-y-[4px] border-y-transparent border-l-[7px] border-l-blue-600 inline-block"></span>
-          Compilar
         </button>
       </header>
 
