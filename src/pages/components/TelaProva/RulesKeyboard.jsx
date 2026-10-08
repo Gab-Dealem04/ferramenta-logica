@@ -1,6 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { InlineMath } from "react-katex";
 import { availableRules } from "../../../utils/proofLogic";
+
+// Teclado 1: regras com símbolo (15 + botão de troca = 4x4)
+const SYMBOL_RULES = [
+  "∧i", "∧e", "∨i", "∨e",
+  "→i", "→e", "¬i", "¬e",
+  "¬¬i", "¬¬e", "⊥e",
+  "∀i", "∀e", "∃i", "∃e",
+];
+
+// Teclado 2: regras escritas
+const WRITTEN_RULES = ["RAA", "LTM", "copie"];
+
+const ruleByCode = Object.fromEntries(availableRules.map((r) => [r.code, r]));
 
 export default function RulesKeyboard({
   activeLineId,
@@ -9,6 +22,21 @@ export default function RulesKeyboard({
   onClearRule,
   onBack,
 }) {
+  const [page, setPage] = useState("symbols"); // "symbols" | "written"
+
+  const ruleBtn =
+    "py-3 bg-slate-800 text-white rounded-xl text-sm font-black shadow-md active:scale-95 transition-transform flex items-center justify-center";
+  const lightBtn =
+    "py-3 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200 flex items-center justify-center";
+  const pageBtn =
+    "py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-xs font-black active:bg-blue-100 flex items-center justify-center";
+
+  const renderRule = (code) => (
+    <button key={code} onClick={() => onSelectRule(code)} className={ruleBtn}>
+      <InlineMath math={ruleByCode[code].latex} />
+    </button>
+  );
+
   return (
     <div className="space-y-2 animate-in slide-in-from-bottom-2 duration-200">
       <div className="flex items-center justify-between pb-1 border-b">
@@ -20,47 +48,41 @@ export default function RulesKeyboard({
         </button>
       </div>
 
-      {activeLineId !== null && (
-        <button
-          onClick={onDeleteActiveLine}
-          className="w-full py-2 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1 active:scale-98"
-        >
-          <span>🗑</span> Remover Linha {activeLineId}
-        </button>
-      )}
-
-      <div className="grid grid-cols-3 gap-2">
-        <button
-          onClick={() => onSelectRule("PREMISSA")}
-          className="py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200"
-        >
+      <div className="flex gap-1.5">
+        <button onClick={() => onSelectRule("PREMISSA")} className={`flex-1 ${lightBtn}`}>
           Premissa
         </button>
-        <button
-          onClick={() => onSelectRule("HIPÓTESE")}
-          className="py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200"
-        >
+        <button onClick={() => onSelectRule("HIPÓTESE")} className={`flex-1 ${lightBtn}`}>
           Hipótese
         </button>
-        <button
-          onClick={onClearRule}
-          className="py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold active:bg-slate-200 flex items-center justify-center gap-1"
-        >
-          <span>⌫</span>
+        <button onClick={onClearRule} className={`w-12 ${lightBtn}`} title="Limpar regra">
+          ⌫
         </button>
+        {activeLineId !== null && (
+          <button
+            onClick={onDeleteActiveLine}
+            className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold active:bg-red-100 flex items-center justify-center"
+          >
+            Remover {activeLineId}
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5 pt-1">
-        {availableRules.map((rule) => (
-          <button
-            key={rule.code}
-            onClick={() => onSelectRule(rule.code)}
-            className="py-2.5 bg-slate-800 text-white rounded-xl text-xs font-black shadow-md active:scale-95 transition-transform flex items-center justify-center"
-          >
-            <InlineMath math={rule.latex} />
+      {page === "symbols" ? (
+        <div className="grid grid-cols-4 gap-1.5">
+          {SYMBOL_RULES.map(renderRule)}
+          <button onClick={() => setPage("written")} className={pageBtn}>
+            + ›
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-4 gap-1.5">
+          {WRITTEN_RULES.map(renderRule)}
+          <button onClick={() => setPage("symbols")} className={pageBtn}>
+            ‹  ←.
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React from "react";
 import FormulaDisplay from "./FormulaDisplay";
 import RuleWithBox from "./RuleWithBox";
 import NestedBoxes from "./NestedBoxes";
+import { getCursorIndexFromClick } from "../../../utils/cursorFromClick";
 
 export default function ProofLineRow({
   line,
@@ -19,7 +20,15 @@ export default function ProofLineRow({
   const content = (
     <>
       <div
-        onClick={() => onLineClick(line, "formula")}
+        onClick={(e) => {
+          const idx = isSelectingReferences
+            ? undefined
+            : getCursorIndexFromClick(
+                e,
+                isActive ? currentFormula : line.formula || ""
+              );
+          onLineClick(line, "formula", idx);
+        }}
         className="flex-1 flex items-center font-bold text-slate-700 text-base cursor-pointer overflow-x-auto"
       >
         <FormulaDisplay

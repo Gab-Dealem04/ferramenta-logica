@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function FiltersModal({ currentFilter, setFilter, currentSort, setSort, isAsc, setIsAsc, onClose }) {
+export default function FiltersModal({ currentSort, setSort, isAsc, setIsAsc, onClose }) {
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
@@ -10,14 +10,6 @@ export default function FiltersModal({ currentFilter, setFilter, currentSort, se
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
         </div>
         <div className="space-y-3 text-xs">
-          <div className="space-y-1">
-            <label className="text-slate-500 font-semibold">Filtrar por:</label>
-            <select value={currentFilter} onChange={(e) => setFilter(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium text-slate-700 focus:outline-none focus:border-blue-500">
-              <option value="Todos">Todos</option>
-              <option value="Concluído">Concluídos</option>
-              <option value="Pendente">Pendentes</option>
-            </select>
-          </div>
           <div className="space-y-1">
             <label className="text-slate-500 font-semibold">Ordenar por:</label>
             <div className="flex gap-1">

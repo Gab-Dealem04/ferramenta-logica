@@ -6,7 +6,7 @@ export default function MainKeyboard({
   dynamicVariables,
   onTabPress,
   onAddSymbol,
-  onOpenNativeKeyboard,
+  onOpenAddSymbolModal,
   onMoveCursor,
   onConfirmLine,
 }) {
@@ -15,9 +15,9 @@ export default function MainKeyboard({
       <div className="grid grid-cols-8 gap-1">
         <button
           onClick={onTabPress}
-          className="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-xl font-black text-xs active:bg-blue-100 shadow-sm flex items-center justify-center"
+          className="bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-xl font-black text-xl active:bg-blue-100 shadow-sm flex items-center justify-center"
         >
-          ⇥
+          ↹
         </button>
 
         {dynamicVariables.map((s) => (
@@ -31,8 +31,8 @@ export default function MainKeyboard({
         ))}
 
         <button
-          onClick={onOpenNativeKeyboard}
-          title="Digitar nova letra"
+          onClick={onOpenAddSymbolModal}
+          title="Adicionar novo símbolo"
           className="bg-slate-200 border border-slate-300 text-slate-700 py-3 rounded-xl font-black text-xs active:bg-slate-300 shadow-sm flex items-center justify-center"
         >
           ...

@@ -39,10 +39,10 @@ export function getRuleRefType(rule) {
       return "RANGE";
     case "∧i":
     case "→e":
+    case "¬e":
       return "MULTI_LINE";
     case "∧e":
     case "∨i":
-    case "¬e":
     case "¬¬e":
     case "⊥e":
     case "copie":
