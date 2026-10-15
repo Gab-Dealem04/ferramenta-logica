@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "katex/dist/katex.min.css";
 
 import { useProofEditor } from "../hooks/useProofEditor";
 import { getCursorIndexFromClick } from "../utils/cursorFromClick";
+import { checkProof } from "../utils/proofChecker";
 import {
   loadKeyboardSymbols,
   saveKeyboardSymbols,
@@ -21,6 +22,7 @@ import NestedBoxes from "./components/TelaProva/NestedBoxes";
 import ReferenceSelectionBanner from "./components/TelaProva/ReferenceSelectionBanner";
 import MainKeyboard from "./components/TelaProva/MainKeyboard";
 import RulesKeyboard from "./components/TelaProva/RulesKeyboard";
+import ReferenceKeypad from "./components/TelaProva/ReferenceKeypad";
 import AddSymbolModal from "./components/TelaProva/AddSymbolModal";
 
 export default function TelaProvaPage() {
@@ -45,17 +47,24 @@ export default function TelaProvaPage() {
     activeKeyboard,
     setActiveKeyboard,
     isSelectingReferences,
+    refDraft,
+    refCursor,
     handleClearRule,
     handleDeleteActiveLine,
     handleTabPress,
     addSymbol,
     moveCursor,
+    addRefChar,
+    moveRefCursor,
     handleSelectRuleOrMode,
     handleCloseCurrentBox,
     handleLineClick,
     confirmLine,
     finishSelection,
   } = useProofEditor(incomingProof);
+
+  // Erros de sintaxe e de regras, por linha: { [id]: { formula?, rule? } }
+  const lineErrors = useMemo(() => checkProof(lines), [lines]);
 
   // Símbolos do teclado e biblioteca: salvos no localStorage
   const [keyboardSymbols, setKeyboardSymbols] = useState(() => loadKeyboardSymbols());
@@ -149,6 +158,9 @@ export default function TelaProvaPage() {
                 cursorPosition={cursorPosition}
                 closedBoxes={closedBoxes}
                 onLineClick={handleLineClick}
+                refDraft={refDraft}
+                refCursor={refCursor}
+                error={lineErrors[line.id]}
               />
             ))}
           </div>
@@ -181,6 +193,8 @@ export default function TelaProvaPage() {
                   references={selectedReferences}
                   isFocused={focusedField === "rule"}
                   isSelecting={isSelectingReferences}
+                  draft={refDraft}
+                  draftCursor={refCursor}
                   onClick={() => {
                     setFocusedField("rule");
                     setActiveKeyboard("rules");
@@ -207,11 +221,10 @@ export default function TelaProvaPage() {
             <ReferenceSelectionBanner
               currentRule={currentRule}
               selectedReferences={selectedReferences}
-              onFinish={() => finishSelection()}
             />
           )}
 
-          {activeKeyboard === "main" && (
+          {activeKeyboard === "main" && !isSelectingReferences && (
             <MainKeyboard
               dynamicVariables={keyboardSymbols}
               onTabPress={handleTabPress}
@@ -219,6 +232,14 @@ export default function TelaProvaPage() {
               onOpenAddSymbolModal={() => setIsAddSymbolModalOpen(true)}
               onMoveCursor={moveCursor}
               onConfirmLine={confirmLine}
+            />
+          )}
+
+          {activeKeyboard === "main" && isSelectingReferences && (
+            <ReferenceKeypad
+              onChar={addRefChar}
+              onMoveCursor={moveRefCursor}
+              onConfirm={finishSelection}
             />
           )}
 

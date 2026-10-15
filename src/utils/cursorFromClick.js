@@ -1,8 +1,6 @@
 import katex from "katex";
 import { formatToLatex } from "./latexFormat";
 
-// Descobre em qual posição do texto o usuário tocou, medindo a largura
-// de cada prefixo da fórmula renderizada pelo KaTeX.
 export function getCursorIndexFromClick(event, text) {
   if (!text) return 0;
 

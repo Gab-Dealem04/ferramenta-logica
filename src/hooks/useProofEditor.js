@@ -4,6 +4,9 @@ import { getActivity, saveProofData } from "../utils/proofStorage";
 
 /* ---------- helpers puros ---------- */
 
+// Regras cuja linha ABRE uma caixa: hipótese e constante nova (∀i / ∃e)
+const opensBox = (rule) => rule === "HIPÓTESE" || rule === "CONSTANTE";
+
 const mapId = (id, removed) => (id > removed ? id - 1 : id);
 
 function mapRef(ref, removed) {
@@ -95,6 +98,40 @@ function insertLineIntoProof(lines, openBoxes, closedBoxes, afterId) {
   };
 }
 
+// "1,3-5" -> [1, "3-5"]  (traço incompleto, ex. "3-", conta só o 3)
+function parseRefDraft(draft) {
+  const refs = [];
+  for (const raw of draft.split(",")) {
+    const m = raw.trim().match(/^(\d+)(?:-(\d*))?$/);
+    if (!m) continue;
+    const a = Number(m[1]);
+    if (!m[2]) refs.push(a);
+    else {
+      const b = Number(m[2]);
+      refs.push(`${Math.min(a, b)}-${Math.max(a, b)}`);
+    }
+  }
+  return refs;
+}
+
+// impede "1,,2", ",1", "1--3", "1-2-3"
+function canInsertRefChar(draft, pos, ch) {
+  if (/\d/.test(ch)) return true;
+  const before = draft.slice(0, pos);
+  const after = draft.slice(pos);
+  if (!/\d$/.test(before)) return false;
+  if (/^[,-]/.test(after)) return false;
+  if (ch === "-") {
+    const tokenBefore = before.split(",").pop();
+    const tokenAfter = after.split(",")[0];
+    if (tokenBefore.includes("-") || tokenAfter.includes("-")) return false;
+  }
+  return true;
+}
+
+const refIds = (r) =>
+  typeof r === "number" ? [r] : String(r).split("-").map(Number);
+
 export function useProofEditor(incomingProof) {
   const [lines, setLines] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -117,6 +154,10 @@ export function useProofEditor(incomingProof) {
 
   const [isAddSymbolModalOpen, setIsAddSymbolModalOpen] = useState(false);
   const [newSymbolDraft, setNewSymbolDraft] = useState("");
+
+  // rascunho de texto do teclado numérico de referências (ex.: "1,3-5")
+  const [refDraft, setRefDraft] = useState("");
+  const [refCursor, setRefCursor] = useState(0);
 
   // CARREGAR
   useEffect(() => {
@@ -155,6 +196,20 @@ export function useProofEditor(incomingProof) {
     });
   }, [lines, openBoxes, closedBoxes, isLoaded]);
 
+  // Mantém o rascunho do teclado numérico em sincronia com a seleção por toque
+  useEffect(() => {
+    if (!isSelectingReferences) {
+      setRefDraft("");
+      setRefCursor(0);
+      return;
+    }
+    if (JSON.stringify(parseRefDraft(refDraft)) !== JSON.stringify(selectedReferences)) {
+      const d = selectedReferences.join(",");
+      setRefDraft(d);
+      setRefCursor(d.length);
+    }
+  }, [selectedReferences, isSelectingReferences]);
+
   /* ---------- caixas ---------- */
 
   // Remove completamente a caixa iniciada pela hipótese `boxId`
@@ -169,7 +224,7 @@ export function useProofEditor(incomingProof) {
     setClosedBoxes((prev) => prev.filter((b) => b.start !== boxId));
   };
 
-  // Cria a caixa de uma hipótese numa linha que já existe
+  // Cria a caixa de uma hipótese/constante numa linha que já existe
   const addBoxToExistingLine = (lineId) => {
     const isLast = lines.length > 0 && lines[lines.length - 1].id === lineId;
 
@@ -198,8 +253,8 @@ export function useProofEditor(incomingProof) {
     const line = lines.find((l) => l.id === activeLineId);
     if (!line) return;
 
-    const hadBox = line.rule === "HIPÓTESE";
-    const wantsBox = newRule === "HIPÓTESE";
+    const hadBox = opensBox(line.rule);
+    const wantsBox = opensBox(newRule);
 
     if (hadBox && !wantsBox) removeBox(activeLineId);
     else if (!hadBox && wantsBox) addBoxToExistingLine(activeLineId);
@@ -312,7 +367,7 @@ export function useProofEditor(incomingProof) {
           // Linha nova (no fim): puxa a última linha de volta
           const lastLine = lines[lines.length - 1];
 
-          if (lastLine.rule === "HIPÓTESE") {
+          if (opensBox(lastLine.rule)) {
             removeBox(lastLine.id); // a caixa será recriada ao confirmar
           } else {
             // se a linha encerrava caixas, reabre elas
@@ -408,6 +463,45 @@ export function useProofEditor(incomingProof) {
     }
   };
 
+  /* ---------- teclado numérico de referências ---------- */
+
+  const applyRefDraft = (draft, cursor) => {
+    const refs = parseRefDraft(draft);
+    setRefDraft(draft);
+    setRefCursor(cursor);
+    setSelectedReferences(refs);
+    updateCurrentLine(currentFormula, currentRule, refs);
+  };
+
+  const addRefChar = (ch) => {
+    if (ch === "⌫") {
+      if (refCursor === 0) return;
+      applyRefDraft(
+        refDraft.slice(0, refCursor - 1) + refDraft.slice(refCursor),
+        refCursor - 1
+      );
+      return;
+    }
+    if (!canInsertRefChar(refDraft, refCursor, ch)) return;
+    applyRefDraft(
+      refDraft.slice(0, refCursor) + ch + refDraft.slice(refCursor),
+      refCursor + 1
+    );
+  };
+
+  const moveRefCursor = (direction) => {
+    if (direction === "LEFT") setRefCursor((p) => Math.max(0, p - 1));
+    else setRefCursor((p) => Math.min(refDraft.length, p + 1));
+  };
+
+  // descarta referências a linhas inexistentes (quem digita pode errar o número)
+  const getValidRefs = () => {
+    const existing = new Set(lines.map((l) => l.id));
+    return selectedReferences.filter((r) =>
+      refIds(r).every((id) => existing.has(id) && id !== activeLineId)
+    );
+  };
+
   const confirmLineWithRule = (ruleOverride, refsOverride) => {
     const activeRule = ruleOverride !== undefined ? ruleOverride : currentRule;
     const activeRefs = refsOverride !== undefined ? refsOverride : selectedReferences;
@@ -423,7 +517,7 @@ export function useProofEditor(incomingProof) {
         boxScopes: [...openBoxes],
       };
 
-      if (activeRule === "HIPÓTESE") {
+      if (opensBox(activeRule)) {
         if (!newLine.boxScopes.includes(nextId)) newLine.boxScopes.push(nextId);
         setOpenBoxes((prev) => (prev.includes(nextId) ? prev : [...prev, nextId]));
       }
@@ -437,8 +531,9 @@ export function useProofEditor(incomingProof) {
   };
 
   // ENTER numa linha existente: insere uma linha nova logo abaixo
-  const insertLineBelowActive = () => {
+  const insertLineBelowActive = (refsOverride) => {
     const result = insertLineIntoProof(lines, openBoxes, closedBoxes, activeLineId);
+    const refsToSave = refsOverride !== undefined ? refsOverride : selectedReferences;
 
     // garante que a fórmula/regra digitadas na linha ativa ficam salvas
     const withCurrent = result.lines.map((l) =>
@@ -447,7 +542,7 @@ export function useProofEditor(incomingProof) {
             ...l,
             formula: currentFormula,
             rule: currentRule,
-            references: selectedReferences,
+            references: refsToSave,
           }
         : l
     );
@@ -475,7 +570,8 @@ export function useProofEditor(incomingProof) {
 
     setActiveKeyboard("main");
 
-    if (ruleCode === "PREMISSA" || ruleCode === "HIPÓTESE") {
+    // PREMISSA, HIPÓTESE, CONSTANTE e LTE não pedem referências: confirma na hora
+    if (ruleCode === "PREMISSA" || opensBox(ruleCode) || getRuleRefType(ruleCode) === "NONE") {
       setSelectedReferences([]);
       setIsSelectingReferences(false);
       confirmLineWithRule(ruleCode, []);
@@ -528,6 +624,21 @@ export function useProofEditor(incomingProof) {
           built.push(line.id);
           updateCurrentLine(currentFormula, currentRule, built);
           return built;
+        });
+      } else if (refType === "EXISTS_ELIM") {
+        setSelectedReferences((prev) => {
+          let updated;
+          if (prev.length === 0 || prev.length > 2 || typeof prev[1] === "string") {
+            updated = [line.id]; // 1º toque: a fórmula ∃x φ (ou recomeça)
+          } else if (prev.length === 1) {
+            updated = [prev[0], line.id]; // 2º toque: início da caixa
+          } else {
+            const start = Math.min(prev[1], line.id); // 3º toque: fim da caixa
+            const end = Math.max(prev[1], line.id);
+            updated = [prev[0], `${start}-${end}`];
+          }
+          updateCurrentLine(currentFormula, currentRule, updated);
+          return updated;
         });
       } else if (refType === "RANGE") {
         setSelectedReferences((prev) => {
@@ -587,8 +698,20 @@ export function useProofEditor(incomingProof) {
     }
   };
 
-  // Botão OK da seleção de referências: só confirma a regra
-  const finishSelection = () => confirmLineWithRule();
+  // Botão OK do teclado numérico: só confirma a regra (com referências válidas)
+  const finishSelection = () => {
+    confirmLineWithRule(undefined, getValidRefs());
+  };
+
+  // Botão ↵ do teclado numérico: confirma as referências e pula de linha
+  const confirmReferencesAndBreak = () => {
+    const valid = getValidRefs();
+    if (activeLineId !== null) {
+      insertLineBelowActive(valid);
+    } else {
+      confirmLineWithRule(undefined, valid);
+    }
+  };
 
   return {
     lines,
@@ -609,6 +732,8 @@ export function useProofEditor(incomingProof) {
     isSelectingReferences,
     isAddSymbolModalOpen,
     newSymbolDraft,
+    refDraft,
+    refCursor,
     handleClearRule,
     handleDeleteActiveLine,
     handleTabPress,
@@ -619,10 +744,13 @@ export function useProofEditor(incomingProof) {
     confirmNewSymbol,
     cancelNewSymbol,
     moveCursor,
+    addRefChar,
+    moveRefCursor,
     handleSelectRuleOrMode,
     handleCloseCurrentBox,
     handleLineClick,
     confirmLine,
     finishSelection,
+    confirmReferencesAndBreak,
   };
 }

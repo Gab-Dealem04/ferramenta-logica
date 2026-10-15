@@ -10,7 +10,7 @@ export const availableRules = [
   { label: "¬¬i", code: "¬¬i", latex: "\\neg\\neg i" },
   { label: "¬¬e", code: "¬¬e", latex: "\\neg\\neg e" },
   { label: "RAA", code: "RAA", latex: "\\text{RAA}" },
-  { label: "LTM", code: "LTM", latex: "\\text{LTM}" },
+  { label: "LTE", code: "LTE", latex: "\\text{LTE}" },
   { label: "⊥e", code: "⊥e", latex: "\\bot e" },
   { label: "∀i", code: "∀i", latex: "\\forall i" },
   { label: "∀e", code: "∀e", latex: "\\forall e" },
@@ -29,24 +29,33 @@ export const logicalOperators = [
   { latex: "\\exists ", symbol: "∃" },
 ];
 
+// Tipos de referência:
+//   OR_ELIM     ∨e : linha, caixa, caixa        -> [3, "4-5", "6-7"]
+//   EXISTS_ELIM ∃e : linha, caixa               -> [2, "3-5"]
+//   RANGE       →i ¬i RAA ∀i : uma caixa        -> ["3-5"]
+//   MULTI_LINE  duas linhas
+//   SINGLE_LINE uma linha
+//   NONE        LTE (φ ∨ ¬φ): não usa referências
+// A comparação ignora maiúsculas/minúsculas: provas recarregadas do storage
+// guardam as regras em maiúsculas ("∧I").
 export function getRuleRefType(rule) {
-  switch (rule) {
+  switch (String(rule || "").toLowerCase()) {
     case "∨e":
       return "OR_ELIM";
+    case "∃e":
+      return "EXISTS_ELIM";
+    case "lte":
+    case "ltm":
+      return "NONE";
     case "→i":
     case "¬i":
-    case "RAA":
+    case "raa":
+    case "∀i":
       return "RANGE";
     case "∧i":
     case "→e":
     case "¬e":
       return "MULTI_LINE";
-    case "∧e":
-    case "∨i":
-    case "¬¬e":
-    case "⊥e":
-    case "copie":
-      return "SINGLE_LINE";
     default:
       return "SINGLE_LINE";
   }
@@ -55,7 +64,7 @@ export function getRuleRefType(rule) {
 export function getRequiredRefsCount(rule) {
   const type = getRuleRefType(rule);
   if (type === "OR_ELIM") return 3;
-  if (type === "RANGE" || type === "MULTI_LINE") return 2;
+  if (type === "RANGE" || type === "MULTI_LINE" || type === "EXISTS_ELIM") return 2;
   if (type === "SINGLE_LINE") return 1;
   return 0;
 }

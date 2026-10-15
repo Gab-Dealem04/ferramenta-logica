@@ -1,4 +1,13 @@
 import React, { useState } from "react";
+import { 
+  Check, 
+  Pencil, 
+  Download, 
+  Image, 
+  FileCode, 
+  Copy, 
+  Trash2 
+} from "lucide-react";
 
 export default function SimulatorConfigMenu({ initialName, onAction, onClose }) {
   const [name, setName] = useState(initialName);
@@ -18,18 +27,31 @@ export default function SimulatorConfigMenu({ initialName, onAction, onClose }) 
             onChange={(e) => setName(e.target.value)}
             className="bg-transparent text-xs w-full focus:outline-none font-bold text-slate-700 disabled:text-slate-500"
           />
-          <button onClick={() => { if (isEditing) onAction("rename", name); setIsEditing(!isEditing); }} className="text-xs text-blue-600 font-bold">
-            {isEditing ? "✔" : "✏️"}
+          <button 
+            onClick={() => { if (isEditing) onAction("rename", name); setIsEditing(!isEditing); }} 
+            className="text-xs text-blue-600 font-bold p-1 hover:bg-slate-200/50 rounded transition-colors"
+          >
+            {isEditing ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
           </button>
         </div>
         <div className="border-t border-slate-100 my-1.5"></div>
         <div className="space-y-0.5 text-xs font-semibold text-slate-600">
-          <button onClick={() => onAction("import_json")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">📥 Importar (JSON)</button>
-          <button onClick={() => onAction("export_png")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">🖼️ Exportar (PNG)</button>
-          <button onClick={() => onAction("export_json")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">🤖 Exportar (JSON)</button>
-          <button onClick={() => onAction("duplicate")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">👥 Duplicar simulador</button>
+          <button onClick={() => onAction("import_json")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
+            <Download className="w-4 h-4 text-slate-400" /> Importar (JSON)
+          </button>
+          <button onClick={() => onAction("export_png")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
+            <Image className="w-4 h-4 text-slate-400" /> Exportar (PNG)
+          </button>
+          <button onClick={() => onAction("export_json")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
+            <FileCode className="w-4 h-4 text-slate-400" /> Exportar (JSON)
+          </button>
+          <button onClick={() => onAction("duplicate")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left transition-colors">
+            <Copy className="w-4 h-4 text-slate-400" /> Duplicar simulador
+          </button>
           <div className="border-t border-slate-100 my-1.5"></div>
-          <button onClick={() => onAction("delete")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-red-50 text-red-600 text-left transition-colors font-bold">🗑️ Deletar simulador</button>
+          <button onClick={() => onAction("delete")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-red-50 text-red-600 text-left transition-colors font-bold">
+            <Trash2 className="w-4 h-4 text-red-500" /> Deletar simulador
+          </button>
         </div>
       </div>
     </>

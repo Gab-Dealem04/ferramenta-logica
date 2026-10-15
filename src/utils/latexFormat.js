@@ -5,6 +5,7 @@ export function formatToLatex(text) {
   return text
     .replace(/ /g, "\\ ")
     .replace(/→/g, " \\rightarrow ")
+    .replace(/↔/g, " \\leftrightarrow ")
     .replace(/¬/g, " \\neg ")
     .replace(/∧/g, " \\land ")
     .replace(/∨/g, " \\lor ")
@@ -13,7 +14,9 @@ export function formatToLatex(text) {
     .replace(/∃/g, " \\exists  ");
 }
 
+// Ignora maiúsculas/minúsculas: "∧I" (recarregado do storage) == "∧i"
 export function getRuleLatex(code) {
-  const found = availableRules.find((r) => r.code === code);
+  const wanted = String(code || "").toLowerCase();
+  const found = availableRules.find((r) => r.code.toLowerCase() === wanted);
   return found ? found.latex : formatToLatex(code);
 }

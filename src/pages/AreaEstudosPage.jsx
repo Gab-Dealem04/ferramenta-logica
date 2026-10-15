@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { SlidersHorizontal } from "lucide-react";
 import AddProofModal from "./components/AddProofModal";
 import SimulatorConfigMenu from "./components/SimulatorConfigMenu";
 import FiltersModal from "./components/FiltersModal";
@@ -144,11 +145,12 @@ export default function AreaEstudosPage() {
       </header>
 
       <div className="flex bg-white border-b sticky top-0 z-10">
-        <button onClick={() => setActiveTab("historico")} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === "historico" ? "border-blue-600 text-blue-600 bg-blue-50/30" : "border-transparent text-slate-400"}`}>
-          🎓 Histórico de Atividades
+        {/* Ajustado aqui com pl-4 e text-left para deslocar o texto para a esquerda */}
+        <button onClick={() => setActiveTab("historico")} className={`flex-1 py-3 pl-4 text-left text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === "historico" ? "border-blue-600 text-blue-600 bg-blue-50/30" : "border-transparent text-slate-400"}`}>
+          Histórico de Atividades
         </button>
         <button onClick={() => setActiveTab("materiais")} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === "materiais" ? "border-blue-600 text-blue-600 bg-blue-50/30" : "border-transparent text-slate-400"}`}>
-          📄 PDFs e Materiais
+          PDFs e Materiais
         </button>
       </div>
 
@@ -159,7 +161,9 @@ export default function AreaEstudosPage() {
               <div className="space-y-3 animate-in fade-in duration-200">
                 <div className="flex justify-between items-center relative">
                   <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Minhas Atividades Realizadas</h2>
-                  <button onClick={() => setIsFiltersOpen(!isFiltersOpen)} className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors text-xs font-bold flex items-center gap-1">⚙️ Filtros</button>
+                  <button onClick={() => setIsFiltersOpen(!isFiltersOpen)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors text-xs font-bold flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5" /> Filtros
+                  </button>
                   {isFiltersOpen && (
                     <FiltersModal
                       currentSort={sortType}
