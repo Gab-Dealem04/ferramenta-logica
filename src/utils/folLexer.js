@@ -10,6 +10,9 @@
  *   Para restringir as constantes: conventions: { constants: "abcde" } e
  *   qualquer outra letra passa a dar erro.
  *
+ * NOMES DECLARADOS (opção `constants`): lista de nomes que valem como constante
+ *   em qualquer formato (x0, socrates...). Vem dos cabeçalhos de caixa "nome: fórmula".
+ *
  * CONECTIVOS / QUANTIFICADORES (Unicode ou ASCII):
  *   ¬ ~   ∧ &   ∨ |   → ->   ↔ <->   ∀ forall   ∃ exists   ⊥
  * ========================================================================== */
@@ -38,6 +41,9 @@ export const TOKEN = Object.freeze({
   BOTTOM: "BOTTOM",
   EOF: "EOF",
 });
+
+// Caracteres que podem fazer parte de um nome declarado
+const NAME_CHAR = /[\p{L}\p{N}_']/u;
 
 export class LogicSyntaxError extends Error {
   /** @param {string} reason mensagem sem posição; @param {number} position índice 0-based */
@@ -121,6 +127,7 @@ export function tokenize(input, options = {}) {
   const conv = resolveConventions(options.conventions);
   const text = String(input ?? "");
   const tokens = [];
+  const declaredNames = [...(options.constants || [])].sort((x, y) => y.length - x.length);
   let i = 0;
 
   while (i < text.length) {
@@ -128,6 +135,16 @@ export function tokenize(input, options = {}) {
 
     if (/\s/.test(ch)) {
       i++;
+      continue;
+    }
+
+    // Nome declarado num cabeçalho de caixa: é constante, qualquer que seja o formato
+    const declared = declaredNames.find(
+      (n) => text.startsWith(n, i) && !NAME_CHAR.test(text[i + n.length] ?? "")
+    );
+    if (declared) {
+      tokens.push({ type: TOKEN.CONST, value: declared, pos: i });
+      i += declared.length;
       continue;
     }
 
@@ -169,6 +186,13 @@ export function tokenize(input, options = {}) {
       tokens.push({ type, value, pos: i });
       i = j;
       continue;
+    }
+
+    if (ch === ":") {
+      throw new LogicSyntaxError(
+        "Os dois pontos só valem na linha que abre uma caixa (Const. ou Hipótese), no formato nome: fórmula",
+        i
+      );
     }
 
     throw new LogicSyntaxError(`Caractere inválido '${ch}'`, i);

@@ -9,6 +9,7 @@ export default function MainKeyboard({
   onOpenAddSymbolModal,
   onMoveCursor,
   onConfirmLine,
+  onOpenBox,
 }) {
   return (
     <div className="space-y-2 animate-in fade-in duration-150">
@@ -59,6 +60,20 @@ export default function MainKeyboard({
       </div>
 
       <div className="flex gap-1.5 h-12">
+        <button
+          onClick={() => onAddSymbol(":")}
+          title="Dois pontos: o nome antes deles é um termo novo da caixa (ex.: a: P(a))"
+          className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200 text-lg"
+        >
+          :
+        </button>
+        <button
+          onClick={onOpenBox}
+          title="Abrir caixa"
+          className="flex-[1.6] bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200 text-xs flex items-center justify-center"
+        >
+          CAIXA
+        </button>
         <button
           onClick={() => onAddSymbol("(")}
           className="flex-1 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200"

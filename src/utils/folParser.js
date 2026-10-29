@@ -303,12 +303,13 @@ class Parser {
  * @param {object} [options]
  * @param {object} [options.conventions]  { constants, functions, variables } (strings de letras)
  * @param {object} [options.signature]    { predicates:{P:1}, functions:{f:1} } aridades pré-declaradas
+ * @param {string[]} [options.constants]  nomes que valem como constante (x0, socrates...)
  * @returns AST da fórmula
  * @throws {LogicSyntaxError} com .reason e .position (0-based)
  */
 export function parseFormula(input, options = {}) {
   const conv = resolveConventions(options.conventions);
-  const tokens = tokenize(input, { conventions: conv });
+  const tokens = tokenize(input, { conventions: conv, constants: options.constants });
 
   if (tokens.length === 1) {
     throw new LogicSyntaxError("A fórmula está vazia", 0);

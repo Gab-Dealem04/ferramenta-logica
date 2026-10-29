@@ -5,6 +5,7 @@ import "katex/dist/katex.min.css";
 import { useProofEditor } from "../hooks/useProofEditor";
 import { getCursorIndexFromClick } from "../utils/cursorFromClick";
 import { checkProof } from "../utils/proofChecker";
+import { getDeclaredNames, indentForScopes } from "../utils/boxNames";
 import {
   loadKeyboardSymbols,
   saveKeyboardSymbols,
@@ -29,6 +30,19 @@ export default function TelaProvaPage() {
   const location = useLocation();
   const incomingProof = location.state?.provaData || null;
 
+  // Trava a rolagem da página: só as áreas internas rolam, então o cabeçalho
+  // fica sempre visível (no celular, 100vh é maior que a tela visível).
+  useEffect(() => {
+    const body = document.body.style.overflow;
+    const html = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = body;
+      document.documentElement.style.overflow = html;
+    };
+  }, []);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddSymbolModalOpen, setIsAddSymbolModalOpen] = useState(false);
 
@@ -49,14 +63,14 @@ export default function TelaProvaPage() {
     isSelectingReferences,
     refDraft,
     refCursor,
-    handleClearRule,
-    handleDeleteActiveLine,
+    handleRuleBackspace,
     handleTabPress,
     addSymbol,
     moveCursor,
     addRefChar,
     moveRefCursor,
     handleSelectRuleOrMode,
+    handleOpenBox,
     handleCloseCurrentBox,
     handleLineClick,
     confirmLine,
@@ -65,6 +79,9 @@ export default function TelaProvaPage() {
 
   // Erros de sintaxe e de regras, por linha: { [id]: { formula?, rule? } }
   const lineErrors = useMemo(() => checkProof(lines), [lines]);
+
+  // Nomes declarados nos cabeçalhos de caixa ("a: P(a)"): recuam a caixa inteira
+  const declNames = useMemo(() => getDeclaredNames(lines), [lines]);
 
   // Símbolos do teclado e biblioteca: salvos no localStorage
   const [keyboardSymbols, setKeyboardSymbols] = useState(() => loadKeyboardSymbols());
@@ -110,10 +127,13 @@ export default function TelaProvaPage() {
     );
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto border-x shadow-2xl font-sans overflow-hidden relative select-none">
+    <div
+      className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto border-x shadow-2xl font-sans overflow-hidden relative select-none"
+      style={{ height: "100dvh" }}
+    >
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <header className="p-4 bg-white border-b flex justify-between items-center z-10">
+      <header className="p-4 bg-white border-b flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -132,8 +152,8 @@ export default function TelaProvaPage() {
         </button>
       </header>
 
-      <div className="flex flex-col h-full overflow-hidden">
-        <div className="bg-slate-100 border-b px-3 py-2 flex items-center justify-between shadow-sm z-10">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="bg-slate-100 border-b px-3 py-2 flex items-center justify-between shadow-sm z-10 shrink-0">
           <Link
             to="/"
             className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
@@ -142,7 +162,7 @@ export default function TelaProvaPage() {
           </Link>
         </div>
 
-        <div className="flex-1 bg-white relative overflow-y-auto p-4 shadow-inner">
+        <div className="flex-1 min-h-0 bg-white relative overflow-y-auto p-4 shadow-inner">
           <div className="absolute left-10 top-0 bottom-0 w-[1px] bg-red-200"></div>
 
           <div className="space-y-0">
@@ -161,6 +181,7 @@ export default function TelaProvaPage() {
                 refDraft={refDraft}
                 refCursor={refCursor}
                 error={lineErrors[line.id]}
+                indentEm={indentForScopes(line.boxScopes, declNames, line.id)}
               />
             ))}
           </div>
@@ -179,6 +200,7 @@ export default function TelaProvaPage() {
                     setCursorPosition(getCursorIndexFromClick(e, currentFormula));
                   }}
                   className="flex-1 flex items-center cursor-pointer"
+                  style={{ paddingLeft: `${indentForScopes(openBoxes, declNames)}em` }}
                 >
                   <FormulaDisplay
                     text={currentFormula}
@@ -205,7 +227,7 @@ export default function TelaProvaPage() {
           )}
         </div>
 
-        <div className="bg-white p-3 space-y-2 border-t z-10">
+        <div className="bg-white p-3 space-y-2 border-t z-10 shrink-0">
           {openBoxes.length > 0 && (
             <div className="flex justify-end">
               <button
@@ -232,6 +254,7 @@ export default function TelaProvaPage() {
               onOpenAddSymbolModal={() => setIsAddSymbolModalOpen(true)}
               onMoveCursor={moveCursor}
               onConfirmLine={confirmLine}
+              onOpenBox={handleOpenBox}
             />
           )}
 
@@ -245,10 +268,9 @@ export default function TelaProvaPage() {
 
           {activeKeyboard === "rules" && (
             <RulesKeyboard
-              activeLineId={activeLineId}
-              onDeleteActiveLine={handleDeleteActiveLine}
               onSelectRule={handleSelectRuleOrMode}
-              onClearRule={handleClearRule}
+              onClearRule={handleRuleBackspace}
+              onConfirmLine={confirmLine}
               onBack={() => {
                 setActiveKeyboard("main");
                 setFocusedField("formula");

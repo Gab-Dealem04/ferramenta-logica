@@ -176,7 +176,8 @@ export function useProofEditor(incomingProof) {
         ...line,
         boxScopes: line.boxScopes || [],
         references: line.references || [],
-        rule: line.rule ? line.rule.toUpperCase() : "PREMISSA",
+        // linha sem regra continua sem regra (antes virava PREMISSA ao recarregar)
+        rule: line.rule ? line.rule.toUpperCase() : "",
       }));
 
     setLines(loaded);
@@ -305,6 +306,20 @@ export function useProofEditor(incomingProof) {
     setSelectedReferences([]);
     setIsSelectingReferences(false);
     updateCurrentLine(currentFormula, "", []);
+  };
+
+  // ⌫ do teclado de regras: 1º toque limpa a regra; com a regra já vazia,
+  // volta para a fórmula e troca para o teclado principal
+  const handleRuleBackspace = () => {
+    if (currentRule) {
+      handleClearRule();
+      return;
+    }
+
+    setIsSelectingReferences(false);
+    setCursorPosition(currentFormula.length);
+    setFocusedField("formula");
+    setActiveKeyboard("main");
   };
 
   const handleDeleteActiveLine = () => {
@@ -581,6 +596,47 @@ export function useProofEditor(incomingProof) {
     }
   };
 
+  // Botão de caixa (teclado principal): abre uma caixa na linha atual.
+  //  - a linha fica com a regra CONSTANTE (rótulo em branco) e continua ativa;
+  //  - se depois você escolher Hipótese, só troca o rótulo: a caixa já existe e
+  //    NÃO é criada de novo (syncBoxWithRule vê que CONSTANTE e HIPÓTESE abrem caixa);
+  //  - escolher Hipótese direto, sem apertar este botão, continua criando a caixa.
+  const handleOpenBox = () => {
+    if (activeLineId !== null) {
+      const line = lines.find((l) => l.id === activeLineId);
+      if (!line || opensBox(line.rule)) return; // já abre uma caixa
+
+      syncBoxWithRule("CONSTANTE");
+      setCurrentRule("CONSTANTE");
+      setSelectedReferences([]);
+      setIsSelectingReferences(false);
+      updateCurrentLine(currentFormula, "CONSTANTE", []);
+      return;
+    }
+
+    // Linha nova no fim: cria a linha com a caixa e continua nela
+    const nextId = lines.length > 0 ? Math.max(...lines.map((l) => l.id)) + 1 : 1;
+
+    setLines((prev) => [
+      ...prev,
+      {
+        id: nextId,
+        formula: currentFormula || "",
+        rule: "CONSTANTE",
+        references: [],
+        boxScopes: [...openBoxes, nextId],
+      },
+    ]);
+    setOpenBoxes((prev) => (prev.includes(nextId) ? prev : [...prev, nextId]));
+
+    setActiveLineId(nextId);
+    setCurrentRule("CONSTANTE");
+    setSelectedReferences([]);
+    setIsSelectingReferences(false);
+    setFocusedField("formula");
+    setActiveKeyboard("main");
+  };
+
   const handleCloseCurrentBox = () => {
     if (openBoxes.length > 0) {
       const closedBoxStart = openBoxes[openBoxes.length - 1];
@@ -735,6 +791,7 @@ export function useProofEditor(incomingProof) {
     refDraft,
     refCursor,
     handleClearRule,
+    handleRuleBackspace,
     handleDeleteActiveLine,
     handleTabPress,
     addSymbol,
@@ -747,6 +804,7 @@ export function useProofEditor(incomingProof) {
     addRefChar,
     moveRefCursor,
     handleSelectRuleOrMode,
+    handleOpenBox,
     handleCloseCurrentBox,
     handleLineClick,
     confirmLine,

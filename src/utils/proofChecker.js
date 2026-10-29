@@ -26,13 +26,14 @@
  *   ∃e   ∃x φ , caixa[c φ[c/x] … χ] ⊢ χ   (c = constante NOVA)
  *
  * CAIXAS COM NOME NOVO (∀i e ∃e). A linha que abre a caixa é CONSTANTE
- * (botão "Const.", rótulo em branco) ou HIPÓTESE:
- *   "a"        só declara o nome novo a (usado em ∀i)
- *   "a ¬P(a)"  declara a e já dá a hipótese (como na ferramenta de exemplo)
- *   "¬P(a)"    só a hipótese; em ∃e o nome novo é deduzido (é o `a`)
- * O nome novo pode ser QUALQUER constante ou variável livre: a, s, k, x0, x₀...
- * (alguns livros usam x0 no lugar de a). Constante e variável livre com o
- * mesmo nome são tratadas como o mesmo símbolo.
+ * (botão "Const.", rótulo em branco) ou HIPÓTESE, no formato  nome: fórmula
+ *   "a:"          só declara o nome novo a (usado em ∀i)
+ *   "a: ¬P(a)"    declara a e já dá a hipótese (como nos livros)
+ *   "x0: P(x0)"   o nome pode ser qualquer um: x0, s, socrates...
+ * Tudo que vem ANTES dos dois pontos é um termo (constante) novo e vale para a
+ * caixa inteira: dentro dela, o nome é lido como constante, qualquer que seja o
+ * formato (x0 não vira variável; socrates não vira s·o·c·r·a·t·e·s).
+ * Ainda aceitos: "a" / "a φ" (sem dois pontos) e só "φ" (em ∃e o nome é deduzido).
  * "Novo" = não aparece em nenhuma linha visível antes da caixa, nem na
  * fórmula ∃x φ, nem na conclusão da regra.
  *
@@ -43,6 +44,7 @@
 
 import { parseFormula, formatFormula } from "./folParser";
 import { tokenize, TOKEN } from "./folLexer";
+import { parseHeader } from "./boxNames";
 
 class RuleError extends Error {}
 class Skip extends Error {} // depende de uma linha com erro de sintaxe: não marca
@@ -186,12 +188,12 @@ function checkNoCapture(body, v, term, quantFormula) {
 
 /* ---------- leitura das linhas ---------- */
 
-// "a" -> declara o nome novo; "a φ" -> declara e já dá a hipótese.
+// Formato antigo, sem dois pontos: "a" declara o nome; "a φ" declara e dá a hipótese.
 // Devolve { ast, fresh } | { error } | null (se a linha não tem esse formato)
-function parseDeclaration(text) {
+function parseDeclaration(text, names) {
   let tokens;
   try {
-    tokens = tokenize(text);
+    tokens = tokenize(text, { constants: names });
   } catch {
     return null;
   }
@@ -200,7 +202,7 @@ function parseDeclaration(text) {
   const rest = text.slice(tokens[1].pos).trim();
   if (!rest) return { ast: null, fresh: tokens[0].value };
   try {
-    return { ast: parseFormula(rest), fresh: tokens[0].value };
+    return { ast: parseFormula(rest, { constants: names }), fresh: tokens[0].value };
   } catch (e) {
     return { error: e.message };
   }
@@ -208,27 +210,43 @@ function parseDeclaration(text) {
 
 // Devolve { empty } | { error } | { ast, fresh }
 //   fresh = nome novo declarado no início de uma caixa (ou null)
-//   ast   = null quando a linha só declara o nome ("a")
-function parseLine(line) {
+//   ast   = null quando a linha só declara o nome ("a:")
+// `names` = nomes declarados nas caixas que contêm a linha (valem como constante).
+function parseLine(line, names) {
   const text = (line.formula || "").trim();
   if (!text) return { empty: true };
 
   const rule = normRule(line.rule);
+  const opts = { constants: names };
 
-  // Linha "constante": só o nome novo (ex.: a, s, x0), nunca uma fórmula comum.
+  // Cabeçalho de caixa:  nome: fórmula
+  if (rule === "hipótese" || rule === "constante") {
+    const h = parseHeader(text);
+    if (h) {
+      const rest = h.rest.trim();
+      if (!rest) return { ast: null, fresh: h.name };
+      try {
+        return { ast: parseFormula(rest, opts), fresh: h.name };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+  }
+
+  // Linha "constante" sem dois pontos: só o nome (ex.: a, x0)
   if (rule === "constante") {
     return (
-      parseDeclaration(text) || {
-        error: "Uma linha de constante nova deve conter só o nome (ex.: a ou x0)",
+      parseDeclaration(text, names) || {
+        error: "Uma linha de constante nova deve ter o formato nome: (ex.: a: ou x0:)",
       }
     );
   }
 
   try {
-    return { ast: parseFormula(text), fresh: null };
+    return { ast: parseFormula(text, opts), fresh: null };
   } catch (err) {
     if (rule === "hipótese") {
-      const decl = parseDeclaration(text);
+      const decl = parseDeclaration(text, names);
       if (decl) return decl;
     }
     return { error: err.message };
@@ -585,8 +603,19 @@ export function checkProof(rawLines) {
   const info = new Map();
   const result = {};
 
+  // 1ª fase: nomes declarados nos cabeçalhos de caixa ("nome: ...")
+  const declName = new Map();
   for (const l of lines) {
-    const parsed = parseLine(l);
+    const r = normRule(l.rule);
+    if (r !== "hipótese" && r !== "constante") continue;
+    const h = parseHeader((l.formula || "").trim());
+    if (h) declName.set(l.id, h.name);
+  }
+
+  // 2ª fase: lê cada linha sabendo quais nomes valem como constante nela
+  for (const l of lines) {
+    const names = l.boxScopes.map((s) => declName.get(s)).filter(Boolean);
+    const parsed = parseLine(l, names);
     info.set(l.id, parsed);
     if (parsed.error) result[l.id] = { formula: parsed.error };
   }

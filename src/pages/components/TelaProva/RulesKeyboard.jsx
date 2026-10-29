@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { InlineMath } from "react-katex";
 import { availableRules } from "../../../utils/proofLogic";
 
+// Teclado 1: regras com símbolo (15 + botão de pular linha = 4x4)
 const SYMBOL_RULES = [
   "∧i", "∧e", "∨i", "∨e",
   "→i", "→e", "¬i", "¬e",
@@ -9,7 +10,7 @@ const SYMBOL_RULES = [
   "∀i", "∀e", "∃i", "∃e",
 ];
 
-
+// Teclado 2: regras escritas
 const WRITTEN_RULES = ["RAA", "LTE", "copie"];
 
 const ruleByCode = Object.fromEntries(availableRules.map((r) => [r.code, r]));
@@ -24,8 +25,6 @@ function EnterIcon({ className = "w-5 h-5" }) {
 }
 
 export default function RulesKeyboard({
-  activeLineId,
-  onDeleteActiveLine,
   onSelectRule,
   onClearRule,
   onConfirmLine,
@@ -63,19 +62,9 @@ export default function RulesKeyboard({
         <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">
           Escolha o Tipo ou Regra:
         </span>
-        <div className="flex items-center gap-2">
-          {activeLineId !== null && (
-            <button
-              onClick={onDeleteActiveLine}
-              className="px-2 py-1 bg-red-50 border border-red-200 text-red-600 rounded-lg text-[11px] font-bold active:bg-red-100"
-            >
-              Remover {activeLineId}
-            </button>
-          )}
-          <button onClick={onBack} className="text-xs font-bold text-slate-400 hover:text-slate-600">
-            ✕ Voltar
-          </button>
-        </div>
+        <button onClick={onBack} className="text-xs font-bold text-slate-400 hover:text-slate-600">
+          ✕ Voltar
+        </button>
       </div>
 
       <div className="flex gap-1.5">
@@ -85,20 +74,13 @@ export default function RulesKeyboard({
         <button onClick={() => onSelectRule("HIPÓTESE")} className={`flex-1 ${lightBtn}`}>
           Hipótese
         </button>
-        <button
-          onClick={() => onSelectRule("CONSTANTE")}
-          className={`flex-1 ${lightBtn}`}
-          title="Constante nova (abre caixa do ∀i / ∃e)"
-        >
-          Const.
-        </button>
         {page === "symbols" ? (
           <button
             onClick={() => setPage("written")}
             className={`w-12 ${pageBtn}`}
             title="Regras escritas (RAA, LTE, copie)"
           >
-           ...
+            ...
           </button>
         ) : (
           <button
@@ -106,7 +88,7 @@ export default function RulesKeyboard({
             className={`w-12 ${pageBtn}`}
             title="Regras com símbolo"
           >
-           ⟵ 
+            ⟵
           </button>
         )}
         <button onClick={onClearRule} className={`w-12 ${lightBtn}`} title="Limpar regra">

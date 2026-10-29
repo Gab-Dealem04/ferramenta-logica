@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SlidersHorizontal } from "lucide-react";
 import AddProofModal from "./components/AddProofModal";
@@ -23,6 +23,19 @@ export default function AreaEstudosPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
+  // Trava a rolagem da página: só as áreas internas rolam, então o cabeçalho
+  // fica sempre visível (no celular, 100vh é maior que a tela visível).
+  useEffect(() => {
+    const body = document.body.style.overflow;
+    const html = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = body;
+      document.documentElement.style.overflow = html;
+    };
+  }, []);
+
   const [activeTab, setActiveTab] = useState("historico");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -31,6 +44,9 @@ export default function AreaEstudosPage() {
 
   const [sortType, setSortType] = useState("data_criacao");
   const [isAsc, setIsAsc] = useState(true);
+
+  // "todas" | "Lógica Proposicional" | "Lógica de Predicados"
+  const [typeFilter, setTypeFilter] = useState("todas");
 
   // A fonte da verdade é o localStorage (via proofStorage).
   const [historicoAtividades, setHistoricoAtividades] = useState(() => loadActivities());
@@ -114,16 +130,24 @@ export default function AreaEstudosPage() {
     }
   };
 
-  const itensOrdenados = [...historicoAtividades].sort((a, b) => {
-    const campo = sortType === "data_criacao" ? "dataCriacao" : "ultimaModificacao";
-    return isAsc ? a[campo] - b[campo] : b[campo] - a[campo];
-  });
+  // Primeiro filtra pelo tipo de lógica, depois ordena
+  const itensOrdenados = historicoAtividades
+    .filter((a) => typeFilter === "todas" || a.tipoDeducao === typeFilter)
+    .sort((a, b) => {
+      const campo = sortType === "data_criacao" ? "dataCriacao" : "ultimaModificacao";
+      return isAsc ? a[campo] - b[campo] : b[campo] - a[campo];
+    });
+
+  const hasActiveFilter = typeFilter !== "todas";
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto border-x shadow-2xl font-sans overflow-hidden relative">
+    <div
+      className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto border-x shadow-2xl font-sans overflow-hidden relative"
+      style={{ height: "100dvh" }}
+    >
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      <header className="p-4 bg-white border-b flex justify-between items-center z-10">
+      <header className="p-4 bg-white border-b flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => setIsSidebarOpen(true)} className="p-1.5 rounded-lg text-slate-700 font-bold text-lg">☰</button>
           <h1 className="font-black text-slate-800 tracking-tight text-base">LOGIC_LAB</h1>
@@ -144,7 +168,7 @@ export default function AreaEstudosPage() {
         />
       </header>
 
-      <div className="flex bg-white border-b sticky top-0 z-10">
+      <div className="flex bg-white border-b z-10 shrink-0">
         {/* Ajustado aqui com pl-4 e text-left para deslocar o texto para a esquerda */}
         <button onClick={() => setActiveTab("historico")} className={`flex-1 py-3 pl-4 text-left text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === "historico" ? "border-blue-600 text-blue-600 bg-blue-50/30" : "border-transparent text-slate-400"}`}>
           Histórico de Atividades
@@ -154,15 +178,18 @@ export default function AreaEstudosPage() {
         </button>
       </div>
 
-      <div className="flex-1 bg-white relative overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-white relative overflow-hidden flex flex-col">
         <div className="h-full overflow-y-auto p-4 relative">
           <div className="pl-2 space-y-4">
             {activeTab === "historico" && (
               <div className="space-y-3 animate-in fade-in duration-200">
                 <div className="flex justify-between items-center relative">
                   <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Minhas Atividades Realizadas</h2>
-                  <button onClick={() => setIsFiltersOpen(!isFiltersOpen)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors text-xs font-bold flex items-center gap-1.5">
+                  <button onClick={() => setIsFiltersOpen(!isFiltersOpen)} className="relative p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors text-xs font-bold flex items-center gap-1.5">
                     <SlidersHorizontal className="w-3.5 h-3.5" /> Filtros
+                    {hasActiveFilter && (
+                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-blue-600" />
+                    )}
                   </button>
                   {isFiltersOpen && (
                     <FiltersModal
@@ -170,10 +197,34 @@ export default function AreaEstudosPage() {
                       setSort={setSortType}
                       isAsc={isAsc}
                       setIsAsc={setIsAsc}
+                      typeFilter={typeFilter}
+                      setTypeFilter={setTypeFilter}
                       onClose={() => setIsFiltersOpen(false)}
                     />
                   )}
                 </div>
+
+                {hasActiveFilter && (
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold">
+                      {typeFilter}
+                    </span>
+                    <button
+                      onClick={() => setTypeFilter("todas")}
+                      className="text-slate-400 hover:text-slate-600 font-bold"
+                    >
+                      ✕ Limpar filtro
+                    </button>
+                  </div>
+                )}
+
+                {itensOrdenados.length === 0 && (
+                  <div className="text-center text-xs text-slate-400 font-medium py-8">
+                    {hasActiveFilter
+                      ? "Nenhuma atividade deste tipo."
+                      : "Nenhuma atividade ainda. Toque em Adicionar para criar."}
+                  </div>
+                )}
 
                 {itensOrdenados.map((prova) => (
                   <div key={prova.id} className="relative border border-slate-100 rounded-xl p-3.5 hover:border-blue-300 transition-all flex items-center justify-between gap-3 bg-white shadow-sm group">

@@ -4,9 +4,12 @@ import RuleWithBox from "./RuleWithBox";
 import NestedBoxes from "./NestedBoxes";
 import { getCursorIndexFromClick } from "../../../utils/cursorFromClick";
 
+// Linha ondulada vermelha (como o corretor ortográfico), desenhada em SVG.
 const SQUIGGLE =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4' viewBox='0 0 6 4'%3E%3Cpath d='M0 2 Q1.5 0 3 2 T6 2' fill='none' stroke='%23ef4444' stroke-width='1.2'/%3E%3C/svg%3E\")";
 
+// Envolve o conteúdo e, se `active`, sublinha com a onda vermelha.
+// (text-decoration não funciona no KaTeX, por isso a onda é um elemento à parte.)
 function Squiggle({ active, title, children }) {
   return (
     <span className="relative inline-flex items-center shrink-0" title={active ? title : undefined}>
@@ -41,6 +44,7 @@ export default function ProofLineRow({
   refDraft,
   refCursor,
   error, // { formula?: string, rule?: string } vindo do checkProof
+  indentEm = 0, // recuo das caixas com nome ("a: ...") em que a linha está
 }) {
   const scopes = line.boxScopes || [];
 
@@ -62,6 +66,7 @@ export default function ProofLineRow({
           onLineClick(line, "formula", idx);
         }}
         className="flex-1 flex items-center font-bold text-slate-700 text-base cursor-pointer overflow-x-auto"
+        style={indentEm ? { paddingLeft: `${indentEm}em` } : undefined}
       >
         <Squiggle active={!!formulaError} title={formulaError}>
           <FormulaDisplay
