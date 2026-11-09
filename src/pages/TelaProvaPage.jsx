@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import "katex/dist/katex.min.css";
 
 import { useProofEditor } from "../hooks/useProofEditor";
@@ -153,12 +154,13 @@ export default function TelaProvaPage() {
       </header>
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="bg-slate-100 border-b px-3 py-2 flex items-center justify-between shadow-sm z-10 shrink-0">
+        <div className="bg-slate-100 border-b border-slate-200 px-2 py-1 flex items-center shrink-0 z-10 shadow-sm">
           <Link
             to="/"
-            className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
+            className="flex items-center gap-0.5 px-1 py-1 rounded-lg text-xs font-semibold text-blue-600 hover:text-blue-800 active:bg-slate-200 transition-colors"
           >
-            ← Voltar ao Histórico
+            <ChevronLeft className="w-4 h-4" />
+            Voltar
           </Link>
         </div>
 
@@ -234,7 +236,7 @@ export default function TelaProvaPage() {
                 onClick={handleCloseCurrentBox}
                 className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-[10px] rounded-lg shadow transition-all flex items-center gap-1 active:scale-95"
               >
-                <span>↵</span> Encerrar Caixa ({openBoxes.length})
+                <span></span> Encerrar Caixa ({openBoxes.length})
               </button>
             </div>
           )}

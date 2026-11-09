@@ -19,6 +19,12 @@ import {
   parseImportedActivity,
 } from "../utils/proofExport";
 
+// Opções de "Ordenar por" que colocam uma variante lógica no topo da lista
+const VARIANT_FIRST = {
+  proposicional: "Lógica Proposicional",
+  predicados: "Lógica de Predicados",
+};
+
 export default function AreaEstudosPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -44,9 +50,6 @@ export default function AreaEstudosPage() {
 
   const [sortType, setSortType] = useState("data_criacao");
   const [isAsc, setIsAsc] = useState(true);
-
-  // "todas" | "Lógica Proposicional" | "Lógica de Predicados"
-  const [typeFilter, setTypeFilter] = useState("todas");
 
   // A fonte da verdade é o localStorage (via proofStorage).
   const [historicoAtividades, setHistoricoAtividades] = useState(() => loadActivities());
@@ -130,15 +133,19 @@ export default function AreaEstudosPage() {
     }
   };
 
-  // Primeiro filtra pelo tipo de lógica, depois ordena
-  const itensOrdenados = historicoAtividades
-    .filter((a) => typeFilter === "todas" || a.tipoDeducao === typeFilter)
-    .sort((a, b) => {
-      const campo = sortType === "data_criacao" ? "dataCriacao" : "ultimaModificacao";
-      return isAsc ? a[campo] - b[campo] : b[campo] - a[campo];
-    });
+  const itensOrdenados = [...historicoAtividades].sort((a, b) => {
+    // Variante lógica escolhida no topo; dentro de cada grupo, as mais antigas primeiro
+    const first = VARIANT_FIRST[sortType];
+    if (first) {
+      const aFirst = a.tipoDeducao === first;
+      const bFirst = b.tipoDeducao === first;
+      if (aFirst !== bFirst) return aFirst ? -1 : 1;
+      return a.dataCriacao - b.dataCriacao;
+    }
 
-  const hasActiveFilter = typeFilter !== "todas";
+    const campo = sortType === "data_criacao" ? "dataCriacao" : "ultimaModificacao";
+    return isAsc ? a[campo] - b[campo] : b[campo] - a[campo];
+  });
 
   return (
     <div
@@ -187,9 +194,6 @@ export default function AreaEstudosPage() {
                   <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Minhas Atividades Realizadas</h2>
                   <button onClick={() => setIsFiltersOpen(!isFiltersOpen)} className="relative p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors text-xs font-bold flex items-center gap-1.5">
                     <SlidersHorizontal className="w-3.5 h-3.5" /> Filtros
-                    {hasActiveFilter && (
-                      <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-blue-600" />
-                    )}
                   </button>
                   {isFiltersOpen && (
                     <FiltersModal
@@ -197,32 +201,14 @@ export default function AreaEstudosPage() {
                       setSort={setSortType}
                       isAsc={isAsc}
                       setIsAsc={setIsAsc}
-                      typeFilter={typeFilter}
-                      setTypeFilter={setTypeFilter}
                       onClose={() => setIsFiltersOpen(false)}
                     />
                   )}
                 </div>
 
-                {hasActiveFilter && (
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold">
-                      {typeFilter}
-                    </span>
-                    <button
-                      onClick={() => setTypeFilter("todas")}
-                      className="text-slate-400 hover:text-slate-600 font-bold"
-                    >
-                      ✕ Limpar filtro
-                    </button>
-                  </div>
-                )}
-
                 {itensOrdenados.length === 0 && (
                   <div className="text-center text-xs text-slate-400 font-medium py-8">
-                    {hasActiveFilter
-                      ? "Nenhuma atividade deste tipo."
-                      : "Nenhuma atividade ainda. Toque em Adicionar para criar."}
+                    Nenhuma atividade ainda. Toque em Adicionar para criar.
                   </div>
                 )}
 

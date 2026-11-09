@@ -1,5 +1,15 @@
 import React from "react";
 
+const SORT_OPTIONS = [
+  { value: "data_criacao", label: "Data de criação" },
+  { value: "ultima_modificacao", label: "Última modificação" },
+  { value: "proposicional", label: "Lógica Proposicional primeiro" },
+  { value: "predicados", label: "Lógica de Predicados primeiro" },
+];
+
+// Nas opções de variante a ordem já é definida pela própria opção, então a seta some
+const USES_DIRECTION = ["data_criacao", "ultima_modificacao"];
+
 export default function FiltersModal({ currentSort, setSort, isAsc, setIsAsc, onClose }) {
   return (
     <>
@@ -13,16 +23,33 @@ export default function FiltersModal({ currentSort, setSort, isAsc, setIsAsc, on
           <div className="space-y-1">
             <label className="text-slate-500 font-semibold">Ordenar por:</label>
             <div className="flex gap-1">
-              <select value={currentSort} onChange={(e) => setSort(e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium text-slate-700 focus:outline-none focus:border-blue-500">
-                <option value="data_criacao">Data de criação</option>
-                <option value="ultima_modificacao">Última modificação</option>
+              <select
+                value={currentSort}
+                onChange={(e) => setSort(e.target.value)}
+                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium text-slate-700 focus:outline-none focus:border-blue-500"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
-              <button onClick={() => setIsAsc(!isAsc)} className="px-2.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-sm transition-colors">
-                {isAsc ? "↑" : "↓"}
-              </button>
+              {USES_DIRECTION.includes(currentSort) && (
+                <button
+                  onClick={() => setIsAsc(!isAsc)}
+                  className="px-2.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-600 font-bold text-sm transition-colors"
+                >
+                  {isAsc ? "↑" : "↓"}
+                </button>
+              )}
             </div>
           </div>
-          <button onClick={onClose} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-center transition-colors mt-2">Aplicar</button>
+          <button
+            onClick={onClose}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-center transition-colors mt-2"
+          >
+            Aplicar
+          </button>
         </div>
       </div>
     </>

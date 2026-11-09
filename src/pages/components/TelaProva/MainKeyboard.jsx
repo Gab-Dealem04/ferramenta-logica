@@ -2,6 +2,25 @@ import React from "react";
 import { InlineMath } from "react-katex";
 import { logicalOperators } from "../../../utils/proofLogic";
 
+// Ícone de caixa (quadrado)
+function BoxIcon({ className = "w-5 h-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="1.5" />
+    </svg>
+  );
+}
+
+// Ícone de "enter" (seta para a esquerda com a haste subindo à direita)
+function EnterIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z" />
+    </svg>
+  );
+}
+
 export default function MainKeyboard({
   dynamicVariables,
   onTabPress,
@@ -70,9 +89,9 @@ export default function MainKeyboard({
         <button
           onClick={onOpenBox}
           title="Abrir caixa"
-          className="flex-[1.6] bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-600 active:bg-slate-200 text-xs flex items-center justify-center"
+          className="flex-1 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 active:bg-slate-200 flex items-center justify-center"
         >
-          CAIXA
+          <BoxIcon />
         </button>
         <button
           onClick={() => onAddSymbol("(")}
@@ -100,9 +119,10 @@ export default function MainKeyboard({
         </button>
         <button
           onClick={onConfirmLine}
-          className="flex-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl flex items-center justify-center active:bg-slate-200 font-bold text-lg shadow-sm"
+          title="Pular linha"
+          className="flex-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl flex items-center justify-center active:bg-slate-200 shadow-sm"
         >
-          ↵
+          <EnterIcon />
         </button>
       </div>
     </div>
