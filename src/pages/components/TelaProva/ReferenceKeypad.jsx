@@ -8,7 +8,7 @@ const KEYS = [
 ];
 
 const STYLE = {
-  num: "bg-slate-800 text-white shadow-md",
+  num: "bg-slate-800 text-white shadow-sm",
   sep: "bg-blue-50 border border-blue-200 text-blue-700",
   ctrl: "bg-slate-100 border border-slate-200 text-slate-700",
   ok: "bg-green-50 border-2 border-green-400 text-green-700",
@@ -23,12 +23,12 @@ export default function ReferenceKeypad({ onChar, onMoveCursor, onConfirm }) {
   };
 
   return (
-    <div className="grid grid-cols-4 gap-1.5 animate-in fade-in duration-150">
+    <div className="grid grid-cols-4 gap-1 animate-in fade-in duration-150">
       {KEYS.map(([value, label, kind]) => (
         <button
           key={value}
           onClick={() => press(value)}
-          className={`py-3.5 rounded-xl text-lg font-black active:scale-95 transition-transform flex items-center justify-center ${STYLE[kind]}`}
+          className={`h-12 rounded-lg text-sm font-black active:scale-95 transition-transform flex items-center justify-center ${STYLE[kind]}`}
         >
           {label}
         </button>

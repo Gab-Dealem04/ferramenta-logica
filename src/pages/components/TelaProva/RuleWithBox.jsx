@@ -8,13 +8,26 @@ export default function RuleWithBox({
   references = [],
   isFocused = false,
   isSelecting = false,
-  onClick,
+  onClick, // toque na regra (mantido por compatibilidade)
+  onRuleClick, // toque no nome da regra: abre o teclado de regras
+  onRefsClick, // toque nos números: abre o teclado numérico para editá-los
   draft,
   draftCursor = 0,
 }) {
   const isConstant = rule === "CONSTANTE"; // linha de constante nova: rótulo em branco
   const isSimpleType = rule === "PREMISSA" || rule === "HIPÓTESE" || isConstant;
   const refType = getRuleRefType(rule);
+  const canHaveRefs = !!rule && !isSimpleType && refType !== "NONE";
+
+  const handleRuleClick = onRuleClick || onClick;
+
+  // Os números têm o próprio toque; sem onRefsClick, o toque sobe para a regra.
+  const handleRefsClick = onRefsClick
+    ? (e) => {
+        e.stopPropagation();
+        onRefsClick(e);
+      }
+    : undefined;
 
   const renderSlots = () => {
     if (refType === "OR_ELIM") {
@@ -45,7 +58,7 @@ export default function RuleWithBox({
 
   return (
     <div
-      onClick={onClick}
+      onClick={handleRuleClick}
       className="flex items-center gap-1.5 font-mono text-xs font-bold pr-1 cursor-pointer shrink-0"
     >
       {isFocused && !rule && (
@@ -69,10 +82,12 @@ export default function RuleWithBox({
         </span>
       )}
 
-      {!isSimpleType &&
-        rule &&
+      {canHaveRefs &&
         (isSelecting ? (
-          <div className="min-w-[24px] h-[20px] px-1.5 border border-dashed border-blue-400 rounded flex items-center justify-center bg-blue-50/50 font-bold text-blue-700 text-[11px] ml-0.5">
+          <div
+            onClick={handleRefsClick}
+            className="min-w-[24px] h-[20px] px-1.5 border border-dashed border-blue-400 rounded flex items-center justify-center bg-blue-50/50 font-bold text-blue-700 text-[11px] ml-0.5"
+          >
             {draft ? (
               <span className="flex items-center">
                 {draft.slice(0, draftCursor)}
@@ -83,12 +98,22 @@ export default function RuleWithBox({
               renderSlots()
             )}
           </div>
+        ) : references.length > 0 ? (
+          <span
+            onClick={handleRefsClick}
+            title="Tocar para editar as referências"
+            className="text-blue-700 font-extrabold text-[11px] ml-0.5 px-1 py-1 rounded hover:bg-blue-100 active:bg-blue-200"
+          >
+            {references.join(", ")}
+          </span>
         ) : (
-          references.length > 0 && (
-            <span className="text-blue-700 font-extrabold text-[11px] ml-0.5">
-              {references.join(", ")}
-            </span>
-          )
+          <span
+            onClick={handleRefsClick}
+            title="Tocar para informar as referências"
+            className="text-blue-300 font-bold text-[11px] ml-0.5 px-1.5 py-0.5 border border-dashed border-blue-200 rounded"
+          >
+            {renderSlots()}
+          </span>
         ))}
     </div>
   );

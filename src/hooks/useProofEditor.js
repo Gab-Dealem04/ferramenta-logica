@@ -7,6 +7,12 @@ import { getActivity, saveProofData } from "../utils/proofStorage";
 // Regras cuja linha ABRE uma caixa: hipótese e constante nova (∀i / ∃e)
 const opensBox = (rule) => rule === "HIPÓTESE" || rule === "CONSTANTE";
 
+// Regras que pedem referências (premissa, hipótese, constante e LTE não pedem)
+const needsRefs = (rule) => {
+  const r = String(rule || "").toUpperCase();
+  return !!r && r !== "PREMISSA" && !opensBox(r) && getRuleRefType(rule) !== "NONE";
+};
+
 const mapId = (id, removed) => (id > removed ? id - 1 : id);
 
 function mapRef(ref, removed) {
@@ -359,6 +365,7 @@ export function useProofEditor(incomingProof) {
       } else if (baseText.length === 0) {
         if (activeLineId !== null) {
           // Linha existente e vazia: apaga e volta para a linha anterior
+          const wasLast = lines.length > 0 && lines[lines.length - 1].id === activeLineId;
           const result = deleteLineFromProof(
             lines,
             openBoxes,
@@ -366,12 +373,28 @@ export function useProofEditor(incomingProof) {
             activeLineId
           );
 
-          setLines(result.lines);
-          setOpenBoxes(result.openBoxes);
-          setClosedBoxes(result.closedBoxes);
-
           const prevLine = result.lines.find((l) => l.id === activeLineId - 1);
           const target = prevLine || result.lines.find((l) => l.id === 1);
+
+          let nextOpen = result.openBoxes;
+          let nextClosed = result.closedBoxes;
+
+          // Voltando para a última linha da prova: as caixas que terminam nela
+          // são reabertas (a caixa continua existindo, só volta a ficar aberta)
+          if (wasLast && prevLine) {
+            const reopened = nextClosed
+              .filter((b) => b.end === prevLine.id)
+              .map((b) => b.start);
+
+            if (reopened.length > 0) {
+              nextClosed = nextClosed.filter((b) => b.end !== prevLine.id);
+              nextOpen = [...new Set([...nextOpen, ...reopened])].sort((a, b) => a - b);
+            }
+          }
+
+          setLines(result.lines);
+          setOpenBoxes(nextOpen);
+          setClosedBoxes(nextClosed);
 
           if (target) {
             loadLineIntoEditor(target, prevLine ? undefined : 0);
@@ -379,36 +402,22 @@ export function useProofEditor(incomingProof) {
             resetEditor();
           }
         } else if (lines.length > 0) {
-          // Linha nova (no fim): puxa a última linha de volta
+          // Linha nova (no fim): volta para a última linha da prova.
+          // A linha continua no lugar e as caixas que terminavam nela são reabertas.
           const lastLine = lines[lines.length - 1];
 
-          if (opensBox(lastLine.rule)) {
-            removeBox(lastLine.id); // a caixa será recriada ao confirmar
-          } else {
-            // se a linha encerrava caixas, reabre elas
-            const reopened = closedBoxes
-              .filter((b) => b.end === lastLine.id && b.start !== lastLine.id)
-              .map((b) => b.start)
-              .sort((a, b) => a - b);
+          const reopened = closedBoxes
+            .filter((b) => b.end === lastLine.id)
+            .map((b) => b.start);
 
-            if (reopened.length > 0) {
-              setClosedBoxes((prev) =>
-                prev.filter((b) => !(b.end === lastLine.id && b.start !== lastLine.id))
-              );
-              setOpenBoxes((prev) => [
-                ...prev,
-                ...reopened.filter((id) => !prev.includes(id)),
-              ]);
-            }
+          if (reopened.length > 0) {
+            setClosedBoxes((prev) => prev.filter((b) => b.end !== lastLine.id));
+            setOpenBoxes((prev) =>
+              [...new Set([...prev, ...reopened])].sort((a, b) => a - b)
+            );
           }
 
-          setLines((prev) => prev.slice(0, -1));
-
-          setCurrentFormula(lastLine.formula);
-          setCurrentRule(lastLine.rule);
-          setSelectedReferences(lastLine.references);
-          setCursorPosition(lastLine.formula.length);
-          setActiveLineId(null);
+          loadLineIntoEditor(lastLine);
         }
       }
     } else {
@@ -580,8 +589,17 @@ export function useProofEditor(incomingProof) {
     // linha existente: cria/remove a caixa na hora
     syncBoxWithRule(ruleCode);
 
+    // Ao trocar de regra, as referências só ficam se forem do mesmo tipo
+    // (ex.: ∧e -> ∨i). Senão começam vazias.
+    const keepRefs =
+      needsRefs(currentRule) &&
+      needsRefs(ruleCode) &&
+      getRuleRefType(ruleCode) === getRuleRefType(currentRule);
+    const refsForRule = keepRefs ? selectedReferences : [];
+
     setCurrentRule(ruleCode);
-    updateCurrentLine(currentFormula, ruleCode, selectedReferences);
+    setSelectedReferences(refsForRule);
+    updateCurrentLine(currentFormula, ruleCode, refsForRule);
 
     setActiveKeyboard("main");
 
@@ -745,6 +763,58 @@ export function useProofEditor(incomingProof) {
     }
   };
 
+  // Tocar no nome da regra: abre o teclado de regras.
+  // `line` é null na linha nova (a que ainda não foi confirmada).
+  const handleRuleClick = (line) => {
+    // Linha que já está sendo editada (ou linha nova): sai da escolha de
+    // referências, se estiver nela, e troca para o teclado de regras
+    if (!line || line.id === activeLineId) {
+      setIsSelectingReferences(false);
+      setFocusedField("rule");
+      setActiveKeyboard("rules");
+      return;
+    }
+
+    handleLineClick(line, "rule");
+  };
+
+  // Tocar nos números das referências de uma linha: abre o teclado numérico
+  // para editá-los. `line` é null quando é a linha nova (a que ainda não foi confirmada).
+  const handleRefsClick = (line) => {
+    // Escolhendo referências: tocar em OUTRA linha a escolhe como referência
+    if (isSelectingReferences && line && activeLineId !== line.id) {
+      handleLineClick(line);
+      return;
+    }
+
+    const switching = !!line && activeLineId !== line.id;
+    const rule = switching ? line.rule : currentRule;
+
+    // Regra sem referências para editar: abre o teclado de regras
+    if (!needsRefs(rule)) {
+      if (line) {
+        handleLineClick(line, "rule");
+      } else {
+        setFocusedField("rule");
+        setActiveKeyboard("rules");
+      }
+      return;
+    }
+
+    if (switching) {
+      const formula = line.formula || "";
+      setActiveLineId(line.id);
+      setCurrentFormula(formula);
+      setCursorPosition(formula.length);
+      setCurrentRule(line.rule || "");
+      setSelectedReferences(line.references || []);
+    }
+
+    setIsSelectingReferences(true);
+    setFocusedField("formula");
+    setActiveKeyboard("main");
+  };
+
   // Botão ↵ do teclado: numa linha existente, cria uma linha nova abaixo
   const confirmLine = () => {
     if (activeLineId !== null && !isSelectingReferences) {
@@ -807,6 +877,8 @@ export function useProofEditor(incomingProof) {
     handleOpenBox,
     handleCloseCurrentBox,
     handleLineClick,
+    handleRefsClick,
+    handleRuleClick,
     confirmLine,
     finishSelection,
     confirmReferencesAndBreak,

@@ -5,6 +5,16 @@
 :root {
   --font-geist-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-geist-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Sempre claro, mesmo com o celular no modo escuro */
+  color-scheme: only light;
+  background-color: #ffffff;
+  color: #1e293b;
+}
+
+html {
+  color-scheme: only light;
+  background-color: #ffffff;
 }
 
 body {

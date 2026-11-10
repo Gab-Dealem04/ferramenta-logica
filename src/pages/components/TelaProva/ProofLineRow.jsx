@@ -41,6 +41,8 @@ export default function ProofLineRow({
   cursorPosition,
   closedBoxes,
   onLineClick,
+  onRuleClick, // toque no nome da regra: abre o teclado de regras
+  onRefsClick, // toque nos números das referências: edita só as referências
   refDraft,
   refCursor,
   error, // { formula?: string, rule?: string } vindo do checkProof
@@ -86,10 +88,14 @@ export default function ProofLineRow({
           isSelecting={isActive && isSelectingReferences}
           draft={isActive ? refDraft : undefined}
           draftCursor={refCursor}
-          onClick={(e) => {
+          onRuleClick={(e) => {
             e.stopPropagation();
-            onLineClick(line, "rule");
+            if (onRuleClick) onRuleClick(line);
+            else onLineClick(line, "rule");
           }}
+          onRefsClick={() =>
+            onRefsClick ? onRefsClick(line) : onLineClick(line, "rule")
+          }
         />
       </Squiggle>
     </>

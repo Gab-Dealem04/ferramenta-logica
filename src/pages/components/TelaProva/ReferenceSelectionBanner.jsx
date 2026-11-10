@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { InlineMath } from "react-katex";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { getRuleLatex } from "../../../utils/latexFormat";
 
 // Como escrever as referências de cada regra (chave: código da regra em minúsculas).
@@ -24,23 +25,77 @@ const RULE_HINTS = {
   "∃e": "Informe a fórmula ∃x e a caixa com o nome novo (ex.: 2, 3-5)",
 };
 
+const STORAGE_KEY = "avisoReferenciasMinimizado";
+
+function loadMinimized() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function ReferenceSelectionBanner({ currentRule, selectedReferences }) {
   const hint = RULE_HINTS[String(currentRule || "").toLowerCase()] || null;
 
-  return (
-    <div className="bg-blue-50 border border-blue-200 text-blue-900 px-3 py-2 rounded-lg flex flex-col gap-0.5 animate-in fade-in shadow-sm">
-      <span className="flex items-center flex-wrap gap-x-1 text-sm font-semibold leading-tight">
-        Digite ou clique nas linhas para referenciar a regra
-        <strong>
-          <InlineMath math={getRuleLatex(currentRule)} />
-        </strong>
-        {selectedReferences.length > 0 && (
-          <span className="font-bold bg-blue-200 text-blue-900 px-1.5 py-0.5 rounded text-xs shrink-0">
-            {selectedReferences.join(", ")}
-          </span>
-        )}
+  // A escolha fica salva: quem minimiza uma vez continua com o aviso minimizado
+  const [minimized, setMinimized] = useState(loadMinimized);
+
+  const toggle = () => {
+    const next = !minimized;
+    setMinimized(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      /* sem armazenamento: só vale nesta tela */
+    }
+  };
+
+  const refsBadge =
+    selectedReferences.length > 0 ? (
+      <span className="font-bold bg-blue-200 text-blue-900 px-1.5 py-0.5 rounded text-xs shrink-0">
+        {selectedReferences.join(", ")}
       </span>
-      {hint && <span className="text-[11px] font-medium text-blue-700/80">{hint}</span>}
+    ) : null;
+
+  const toggleBtn = (
+    <button
+      onClick={toggle}
+      title={minimized ? "Mostrar instruções" : "Minimizar"}
+      className="w-7 h-7 -my-1 -mr-1.5 flex items-center justify-center rounded-full text-blue-700 hover:bg-blue-100 active:bg-blue-200 shrink-0 transition-colors"
+    >
+      {minimized ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+    </button>
+  );
+
+  if (minimized) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 text-blue-900 pl-3 pr-2 py-1.5 rounded-lg flex items-center gap-2 shadow-sm">
+        <span className="flex items-center flex-wrap gap-x-1 text-xs font-semibold leading-tight flex-1 min-w-0">
+          Referências de
+          <strong>
+            <InlineMath math={getRuleLatex(currentRule)} />
+          </strong>
+          {refsBadge}
+        </span>
+        {toggleBtn}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 text-blue-900 pl-3 pr-2 py-2 rounded-lg flex items-start gap-2 animate-in fade-in shadow-sm">
+      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+        <span className="flex items-center flex-wrap gap-x-1 text-sm font-semibold leading-tight">
+          Digite ou clique nas linhas para referenciar a regra
+          <strong>
+            <InlineMath math={getRuleLatex(currentRule)} />
+          </strong>
+          {refsBadge}
+        </span>
+        {hint && <span className="text-[11px] font-medium text-blue-700/80">{hint}</span>}
+      </div>
+      {toggleBtn}
     </div>
   );
 }

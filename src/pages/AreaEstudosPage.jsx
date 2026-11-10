@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, FileText, Download } from "lucide-react";
 import AddProofModal from "./components/AddProofModal";
 import SimulatorConfigMenu from "./components/SimulatorConfigMenu";
 import FiltersModal from "./components/FiltersModal";
+import PdfViewer from "./components/PdfViewer";
 import Sidebar from "./components/TelaProva/Sidebar";
 import {
   loadActivities,
@@ -13,17 +14,66 @@ import {
   deleteActivity,
   duplicateActivity,
 } from "../utils/proofStorage";
+import { downloadPdf } from "../utils/materialsStorage";
 import {
   exportActivityToJson,
   exportActivityToPng,
   parseImportedActivity,
 } from "../utils/proofExport";
 
+// PDFs que já vêm com o sistema (ficam em public/materiais)
+const BUILT_IN_MATERIALS = [
+  {
+    id: "builtin-deducao-natural",
+    title: "Dedução Natural — Lógica para Computação",
+    url: `${import.meta.env.BASE_URL}materiais/Deducao_Natural.pdf`,
+    fileName: "Deducao_Natural.pdf",
+    size: "0,7 MB",
+  },
+];
+
 // Opções de "Ordenar por" que colocam uma variante lógica no topo da lista
 const VARIANT_FIRST = {
   proposicional: "Lógica Proposicional",
   predicados: "Lógica de Predicados",
 };
+
+// Cartão de um material: toque no cartão abre o PDF; o ícone à direita baixa
+function MaterialCard({ title, onOpen, onDownload }) {
+  return (
+    <div className="flex items-center rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <button
+        onClick={onOpen}
+        className="flex-1 min-w-0 flex items-center gap-3 p-3.5 text-left active:bg-slate-50 transition-colors"
+      >
+        <div className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 text-red-500 flex items-center justify-center shrink-0">
+          <FileText className="w-4 h-4" />
+        </div>
+        <h3
+          className="font-bold text-sm text-slate-800 leading-snug min-w-0"
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {title}
+        </h3>
+      </button>
+
+      <div className="flex items-center pr-2 shrink-0">
+        <button
+          onClick={onDownload}
+          title="Baixar"
+          className="w-10 h-10 flex items-center justify-center rounded-full text-slate-500 hover:text-blue-600 active:bg-blue-50 transition-colors"
+        >
+          <Download className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AreaEstudosPage() {
   const navigate = useNavigate();
@@ -55,10 +105,8 @@ export default function AreaEstudosPage() {
   const [historicoAtividades, setHistoricoAtividades] = useState(() => loadActivities());
   const refreshList = () => setHistoricoAtividades(loadActivities());
 
-  const materiais = [
-    { id: 1, title: "Manual de Sobrevivência em Dedução Natural", type: "PDF", size: "2.4 MB", downloaded: true },
-    { id: 2, title: "Lista de Exercícios 01 - Tabelas Verdade", type: "PDF", size: "1.1 MB", downloaded: false },
-  ];
+  // PDF aberto no visualizador
+  const [viewer, setViewer] = useState(null); // { title, url }
 
   const handleOpenProof = (prova) => {
     navigate("/tela-prova", { state: { provaData: prova, mode: "edit" } });
@@ -235,27 +283,31 @@ export default function AreaEstudosPage() {
             )}
 
             {activeTab === "materiais" && (
-              <div className="space-y-3 animate-in fade-in duration-200">
+              <div className="space-y-2.5 animate-in fade-in duration-200">
                 <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Arquivos Complementares</h2>
-                {materiais.map((material) => (
-                  <div key={material.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-white shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-red-500 font-black text-[10px] border border-red-100 shrink-0 uppercase">{material.type}</div>
-                      <div>
-                        <h3 className="font-bold text-xs text-slate-700 leading-tight">{material.title}</h3>
-                        <span className="text-[9px] font-mono font-bold text-slate-400">{material.size}</span>
-                      </div>
-                    </div>
-                    <button className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${material.downloaded ? "bg-green-50 text-green-600 border border-green-100" : "bg-blue-600 text-white shadow-sm"}`}>
-                      {material.downloaded ? "✓ Baixado" : "⬇️ Baixar"}
-                    </button>
-                  </div>
+                {BUILT_IN_MATERIALS.map((material) => (
+                  <MaterialCard
+                    key={material.id}
+                    title={material.title}
+                    onOpen={() => setViewer({ title: material.title, url: material.url })}
+                    onDownload={() =>
+                      downloadPdf({ url: material.url, fileName: material.fileName || material.title })
+                    }
+                  />
                 ))}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {viewer && (
+        <PdfViewer
+          title={viewer.title}
+          url={viewer.url}
+          onClose={() => setViewer(null)}
+        />
+      )}
 
       {isAddModalOpen && <AddProofModal onClose={() => setIsAddModalOpen(false)} onCreate={handleCreateNewProof} />}
     </div>

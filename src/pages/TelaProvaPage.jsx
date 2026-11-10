@@ -74,6 +74,8 @@ export default function TelaProvaPage() {
     handleOpenBox,
     handleCloseCurrentBox,
     handleLineClick,
+    handleRefsClick,
+    handleRuleClick,
     confirmLine,
     finishSelection,
   } = useProofEditor(incomingProof);
@@ -180,6 +182,8 @@ export default function TelaProvaPage() {
                 cursorPosition={cursorPosition}
                 closedBoxes={closedBoxes}
                 onLineClick={handleLineClick}
+                onRuleClick={handleRuleClick}
+                onRefsClick={handleRefsClick}
                 refDraft={refDraft}
                 refCursor={refCursor}
                 error={lineErrors[line.id]}
@@ -219,10 +223,8 @@ export default function TelaProvaPage() {
                   isSelecting={isSelectingReferences}
                   draft={refDraft}
                   draftCursor={refCursor}
-                  onClick={() => {
-                    setFocusedField("rule");
-                    setActiveKeyboard("rules");
-                  }}
+                  onRuleClick={() => handleRuleClick(null)}
+                  onRefsClick={() => handleRefsClick(null)}
                 />
               </NestedBoxes>
             </div>
