@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SlidersHorizontal, FileText, Download } from "lucide-react";
-import AddProofModal from "./components/AddProofModal";
-import SimulatorConfigMenu from "./components/SimulatorConfigMenu";
-import FiltersModal from "./components/FiltersModal";
-import PdfViewer from "./components/PdfViewer";
+import AddProofModal from "./components/AreaEstudo/AddProofModal";
+import SimulatorConfigMenu from "./components/AreaEstudo/SimulatorConfigMenu";
+import FiltersModal from "./components/AreaEstudo/FiltersModal";
+import PdfViewer from "./components/AreaEstudo/PdfViewer";
 import Sidebar from "./components/TelaProva/Sidebar";
 import {
   loadActivities,

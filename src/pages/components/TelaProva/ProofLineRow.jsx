@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import FormulaDisplay from "./FormulaDisplay";
 import RuleWithBox from "./RuleWithBox";
 import NestedBoxes from "./NestedBoxes";
@@ -50,15 +51,32 @@ export default function ProofLineRow({
 }) {
   const scopes = line.boxScopes || [];
 
-  // Não marca a linha que está sendo editada (evita piscar enquanto digita).
-  const formulaError = !isActive ? error?.formula : null;
-  const ruleError = !isActive ? error?.rule : null;
-  const message = [formulaError, ruleError].filter(Boolean).join(" · ");
+  const hasError = !!(error?.formula || error?.rule);
+
+  // A mensagem só aparece depois de tocar na linha com erro; fica aberta enquanto
+  // a linha está sendo editada e some quando você vai para outra linha.
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!isActive) setOpen(false);
+  }, [isActive]);
+
+  const reveal = () => {
+    if (hasError && !isActive && !isSelectingReferences) setOpen(true);
+  };
+
+  // Linha vermelha: com erro e fora de edição (ou aberta pelo toque).
+  // Assim não pisca em vermelho enquanto você ainda está digitando.
+  const showRed = hasError && (!isActive || open);
+  const formulaError = showRed ? error?.formula : null;
+  const ruleError = showRed ? error?.rule : null;
+  const message = [error?.formula, error?.rule].filter(Boolean).join(" · ");
 
   const content = (
     <>
       <div
         onClick={(e) => {
+          e.stopPropagation();
+          reveal();
           const idx = isSelectingReferences
             ? undefined
             : getCursorIndexFromClick(
@@ -67,7 +85,7 @@ export default function ProofLineRow({
               );
           onLineClick(line, "formula", idx);
         }}
-        className="flex-1 flex items-center font-bold text-slate-700 text-base cursor-pointer overflow-x-auto"
+        className="flex-1 self-stretch flex items-center font-bold text-slate-700 text-base cursor-pointer overflow-x-auto"
         style={indentEm ? { paddingLeft: `${indentEm}em` } : undefined}
       >
         <Squiggle active={!!formulaError} title={formulaError}>
@@ -90,12 +108,15 @@ export default function ProofLineRow({
           draftCursor={refCursor}
           onRuleClick={(e) => {
             e.stopPropagation();
+            reveal();
             if (onRuleClick) onRuleClick(line);
             else onLineClick(line, "rule");
           }}
-          onRefsClick={() =>
-            onRefsClick ? onRefsClick(line) : onLineClick(line, "rule")
-          }
+          onRefsClick={() => {
+            reveal();
+            if (onRefsClick) onRefsClick(line);
+            else onLineClick(line, "rule");
+          }}
         />
       </Squiggle>
     </>
@@ -104,11 +125,19 @@ export default function ProofLineRow({
   return (
     <div>
       <div
-        className={`relative flex items-center h-10 border-b transition-all select-none ${
+        onClick={() => {
+          reveal();
+          onLineClick(line, "formula");
+        }}
+        className={`relative flex items-center h-10 border-b transition-all select-none cursor-pointer ${
           isActive
-            ? "bg-blue-50/80 border-blue-300"
+            ? showRed
+              ? "bg-red-50 border-red-300"
+              : "bg-blue-50/80 border-blue-300"
             : isSelectedRef
             ? "bg-blue-100/70 border-blue-300"
+            : showRed
+            ? "bg-red-50/80 border-red-300"
             : "border-blue-100 hover:bg-slate-50"
         }`}
       >
@@ -122,9 +151,14 @@ export default function ProofLineRow({
         </NestedBoxes>
       </div>
 
-      {message && (
-        <div className="ml-8 px-2 py-0.5 text-[10px] leading-snug text-red-600 border-b border-red-100 bg-red-50/40">
-          {message}
+      {open && hasError && message && (
+        <div
+          onClick={() => setOpen(false)}
+          title="Toque para fechar"
+          className="ml-8 px-2 py-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-red-700 border-b border-red-200 bg-red-50 cursor-pointer"
+        >
+          <AlertCircle className="w-3.5 h-3.5 mt-px shrink-0" />
+          <span>{message}</span>
         </div>
       )}
     </div>

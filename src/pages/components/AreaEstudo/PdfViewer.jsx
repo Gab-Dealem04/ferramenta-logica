@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { X, Minus, Plus, Download } from "lucide-react";
-import { downloadPdf } from "../../utils/materialsStorage";
+import { downloadPdf } from "../../../utils/materialsStorage";
 
 // O Chrome do celular não mostra PDF dentro de <iframe>, então o PDF é desenhado
 // página por página com o pdf.js, em canvas.
